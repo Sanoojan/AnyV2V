@@ -26,6 +26,7 @@ from diffusers.image_processor import PipelineImageInput, VaeImageProcessor
 from diffusers.loaders import LoraLoaderMixin
 from diffusers.models import AutoencoderKL
 from diffusers.models.lora import adjust_lora_scale_text_encoder
+from .unet_i2vgen_xl2 import I2VGenXLUNet2
 from diffusers.models.unets.unet_i2vgen_xl import I2VGenXLUNet
 from diffusers.schedulers import DDIMScheduler
 from diffusers.utils import (
@@ -43,7 +44,7 @@ from diffusers import DiffusionPipeline
 # Project import
 from pnp_utils import register_time
 from utils import load_ddim_latents_at_t
-
+from einops import rearrange
 logger = logging.get_logger(__name__)  # pylint: disable=invalid-name
 
 EXAMPLE_DOC_STRING = """
@@ -538,15 +539,52 @@ class I2VGenXLPipeline(DiffusionPipeline):
     ):
         image = image.to(device=device)
         image_latents = self.vae.encode(image).latent_dist.sample()
-        image_latents = image_latents * self.vae.config.scaling_factor
+        image_latents = image_latents * self.vae.config.scaling_factor # [1, 4, 64, 64]
 
         # Add frames dimension to image latents
-        image_latents = image_latents.unsqueeze(2)
+        image_latents = image_latents.unsqueeze(2) # [1, 4, 1, 64, 64]
 
         # Append a position mask for each subsequent frame
         # after the intial image latent frame
         frame_position_mask = []
         for frame_idx in range(num_frames - 1):
+            scale = (frame_idx + 1) / (num_frames - 1)
+            frame_position_mask.append(torch.ones_like(image_latents[:, :, :1]) * scale)
+        if frame_position_mask:
+            frame_position_mask = torch.cat(frame_position_mask, dim=2)
+            image_latents = torch.cat([image_latents, frame_position_mask], dim=2)
+
+        # duplicate image_latents for each generation per prompt, using mps friendly method
+        image_latents = image_latents.repeat(num_videos_per_prompt, 1, 1, 1, 1)
+
+        if self.do_classifier_free_guidance:
+            image_latents = torch.cat([image_latents] * 2)
+
+        return image_latents
+    
+    def prepare_images_latents(
+            self,
+            images,
+            device,
+            num_frames,
+            num_videos_per_prompt,
+    ):
+        # images is a list of tensors
+        images=torch.cat(images, dim=0)
+        images = images.to(device=device)
+        num_images = images.shape[0]
+        image_latents = self.vae.encode(images).latent_dist.sample()
+        image_latents = image_latents * self.vae.config.scaling_factor # 8,4,64,64
+        
+        image_latents= rearrange(image_latents, 'f c h w -> 1 c f h w ')  # 1,4,8,64,64
+
+        # Add frames dimension to image latents
+        # image_latents = image_latents.unsqueeze(2)
+
+        # Append a position mask for each subsequent frame
+        # after the intial image latent frame
+        frame_position_mask = []
+        for frame_idx in range(num_frames - num_images):
             scale = (frame_idx + 1) / (num_frames - 1)
             frame_position_mask.append(torch.ones_like(image_latents[:, :, :1]) * scale)
         if frame_position_mask:
@@ -893,6 +931,7 @@ class I2VGenXLPipeline(DiffusionPipeline):
             self,
             prompt: Union[str, List[str]] = None,
             image: PipelineImageInput = None,
+            edited_images: List[PIL.Image.Image] = None,
             height: Optional[int] = 704,
             width: Optional[int] = 1280,
             target_fps: Optional[int] = 16,
@@ -1064,6 +1103,34 @@ class I2VGenXLPipeline(DiffusionPipeline):
             num_videos_per_prompt=num_videos_per_prompt,
         )
 
+        # For edited_images
+        if edited_images is not None:
+            cropped_images = []
+            for edited_image in edited_images:
+                cropped_image = _center_crop_wide(edited_image, (width, width))
+                cropped_image = _resize_bilinear(
+                    cropped_image, (self.feature_extractor.crop_size["width"], self.feature_extractor.crop_size["height"])
+                )
+                cropped_images.append(cropped_image)
+            edited_image_embeddings = self._encode_image(cropped_images, device, num_videos_per_prompt) # [#frames*2, 1,1024]
+            # edited_image_embeddings = torch.cat(edited_image_embeddings) #
+            edited_images_= []
+            for edited_image in edited_images:
+                resized_image = _center_crop_wide(edited_image, (width, height))
+                edited_image = self.image_processor.preprocess(resized_image).to(device=device, dtype=image_embeddings.dtype)
+                edited_images_.append(edited_image)
+                
+            edited_image_latents = self.prepare_images_latents(
+                edited_images_,
+                device=device,
+                num_frames=num_frames,
+                num_videos_per_prompt=num_videos_per_prompt,
+            )  # [2,4,frames,64,64]
+        else:
+            edited_image_latents=image_latents
+        ######### Edited image latents#########
+        
+        
         # [Modified]
         # 3.2.1 Edited first frame encodings.
         cropped_image = _center_crop_wide(ddim_inv_1st_frame, (width, width))
@@ -1091,7 +1158,16 @@ class I2VGenXLPipeline(DiffusionPipeline):
             ddim_inv_1st_frame_latents = _latents
 
         image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, image_embeddings])
-        image_latents_all = torch.cat([ddim_inv_1st_frame_latents, image_latents])
+        # image_latents_all = torch.cat([ddim_inv_1st_frame_latents, image_latents])
+        
+        # # repeat with edited_image_embeddings shape[0]
+        # negative, editing = edited_image_embeddings.chunk(2)
+        # ddim_inv_1st_frame_embeddings_repeat = ddim_inv_1st_frame_embeddings.repeat(editing.shape[0], 1, 1)
+        # edited_image_embeddings= torch.stack([ ddim_inv_1st_frame_embeddings_repeat, negative, editing],dim=1)
+        # image_embeddings_all = edited_image_embeddings.view(-1, edited_image_embeddings.shape[-2], edited_image_embeddings.shape[-1])
+        # # image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, edited_image_embeddings])
+        
+        image_latents_all = torch.cat([ddim_inv_1st_frame_latents, edited_image_latents])
 
         # 3.3 Prepare additional conditions for the UNet.
         if self.do_classifier_free_guidance:
