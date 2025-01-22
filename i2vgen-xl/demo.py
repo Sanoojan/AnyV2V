@@ -207,7 +207,7 @@ config = {
     "data_dir": "/home/sanoojan/Video_diffusion/AnyV2V",  # <-- change this to the path of the data directory, if you cloned the repo, leave it as "..", the inversion latents will be saved in AnyV2V/
     "model_name": "i2vgen-xl",
     "task_name": "Prompt-Based-Editing",
-    "edited_video_name": "Yann is doing exercises for the body and mind 10 frames_test_done",
+    "edited_video_name": "Yann is doing exercises for the body and mind 10 frames_w_emb_wo_latents",
     "output_dir": "${data_dir}/Results/${task_name}/${model_name}/${video_name}/${edited_video_name}/",
 
     # Data

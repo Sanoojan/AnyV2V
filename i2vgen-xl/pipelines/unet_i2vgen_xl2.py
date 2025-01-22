@@ -584,21 +584,21 @@ class I2VGenXLUNet2(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
     
         
         
-        # image_emb = self.context_embedding(image_embeddings)  # 48,1,1024
-        # image_emb = image_emb.view(-1, self.config.in_channels, self.config.cross_attention_dim) # 48,4,1024
-        # to_repeat= num_frames-image_emb.shape[0] // 3
-        # # repeating last 3 from image_emb
-        # image_emb = torch.cat([image_emb, image_emb[-3:].repeat(to_repeat, 1, 1)], dim=0)
-        
-        # # context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
-        # context_emb = context_emb.repeat_interleave(repeats=num_frames, dim=0) # 48,141,1024
-        # context_emb = torch.cat([context_emb, image_emb], dim=1) # 48,145,1024 # added here
-
-
         image_emb = self.context_embedding(image_embeddings)  # 48,1,1024
         image_emb = image_emb.view(-1, self.config.in_channels, self.config.cross_attention_dim) # 48,4,1024
-        context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
+        to_repeat= num_frames-image_emb.shape[0] // 3
+        # repeating last 3 from image_emb
+        image_emb = torch.cat([image_emb, image_emb[-3:].repeat(to_repeat, 1, 1)], dim=0)
+        
+        # context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
         context_emb = context_emb.repeat_interleave(repeats=num_frames, dim=0) # 48,141,1024
+        context_emb = torch.cat([context_emb, image_emb], dim=1) # 48,145,1024 # added here
+
+
+        # image_emb = self.context_embedding(image_embeddings)  # 48,1,1024
+        # image_emb = image_emb.view(-1, self.config.in_channels, self.config.cross_attention_dim) # 48,4,1024
+        # context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
+        # context_emb = context_emb.repeat_interleave(repeats=num_frames, dim=0) # 48,141,1024
        
 
 

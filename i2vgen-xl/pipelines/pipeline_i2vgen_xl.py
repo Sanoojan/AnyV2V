@@ -1157,17 +1157,17 @@ class I2VGenXLPipeline(DiffusionPipeline):
         else:
             ddim_inv_1st_frame_latents = _latents
 
-        image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, image_embeddings])
-        # image_latents_all = torch.cat([ddim_inv_1st_frame_latents, image_latents])
+        # image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, image_embeddings])
+        image_latents_all = torch.cat([ddim_inv_1st_frame_latents, image_latents])
         
-        # # repeat with edited_image_embeddings shape[0]
-        # negative, editing = edited_image_embeddings.chunk(2)
-        # ddim_inv_1st_frame_embeddings_repeat = ddim_inv_1st_frame_embeddings.repeat(editing.shape[0], 1, 1)
-        # edited_image_embeddings= torch.stack([ ddim_inv_1st_frame_embeddings_repeat, negative, editing],dim=1)
-        # image_embeddings_all = edited_image_embeddings.view(-1, edited_image_embeddings.shape[-2], edited_image_embeddings.shape[-1])
-        # # image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, edited_image_embeddings])
+        # repeat with edited_image_embeddings shape[0]
+        negative, editing = edited_image_embeddings.chunk(2)
+        ddim_inv_1st_frame_embeddings_repeat = ddim_inv_1st_frame_embeddings.repeat(editing.shape[0], 1, 1)
+        edited_image_embeddings= torch.stack([ ddim_inv_1st_frame_embeddings_repeat, negative, editing],dim=1)
+        image_embeddings_all = edited_image_embeddings.view(-1, edited_image_embeddings.shape[-2], edited_image_embeddings.shape[-1])
+        # image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, edited_image_embeddings])
         
-        image_latents_all = torch.cat([ddim_inv_1st_frame_latents, edited_image_latents])
+        # image_latents_all = torch.cat([ddim_inv_1st_frame_latents, edited_image_latents])
 
         # 3.3 Prepare additional conditions for the UNet.
         if self.do_classifier_free_guidance:
