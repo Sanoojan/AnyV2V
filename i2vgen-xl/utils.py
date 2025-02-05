@@ -67,9 +67,10 @@ def convert_video_to_frames(video_path, img_size=(512, 512), save_frames=True):
 
 
 # Modified from tokenflow/utils.py
-def load_video_frames(frames_path, n_frames, image_size=(512, 512)):
+def load_video_frames(frames_path, n_frames, image_size=(512, 512),naming_scheme=5):
     # Load paths
-    paths = [f"{frames_path}/%05d.png" % i for i in range(n_frames)]
+    # breakpoint()
+    paths = [f"{frames_path}/%0{naming_scheme}d.png" % i for i in range(n_frames)]
     frames = [load_image(p) for p in paths]
     # Check if the frames are the right size
     for f in frames:

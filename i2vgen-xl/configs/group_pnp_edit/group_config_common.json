@@ -1,0 +1,15 @@
+[
+    {
+        "active": true,
+        "task_name": "Prompt-Based-Editing",
+        "video_name":"ReplaceMe",
+        "edited_first_frame_path":"ReplaceMe",
+        "editing_prompt":"a human",
+        "edited_video_name": "Ori",
+        "ddim_init_latents_t_idx": 0,
+        "pnp_f_t": 1.0,
+        "pnp_spatial_attn_t": 1.0,
+        "pnp_temp_attn_t":1.0
+      }
+
+]

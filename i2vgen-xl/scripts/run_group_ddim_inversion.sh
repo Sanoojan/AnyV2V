@@ -6,3 +6,7 @@ cd ..
 python run_group_ddim_inversion.py \
 --template_config "configs/group_ddim_inversion/template.yaml" \
 --configs_json "configs/group_ddim_inversion/group_config.json"
+
+python run_group_pnp_edit.py \
+--template_config "configs/group_pnp_edit/template.yaml" \
+--configs_json "configs/group_pnp_edit/group_config.json"

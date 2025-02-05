@@ -8,6 +8,8 @@ from omegaconf import OmegaConf
 from PIL import Image
 import json
 
+from natsort import natsorted
+
 # HF imports
 from diffusers import (
     DDIMInverseScheduler,
@@ -23,7 +25,7 @@ from utils import (
     load_ddim_latents_at_T,
     load_ddim_latents_at_t,
 )
-from pipelines.pipeline_i2vgen_xl import I2VGenXLPipeline
+from pipelines.pipeline_i2vgen_xl_ori import I2VGenXLPipeline
 
 
 def ddim_inversion(config, first_frame, frame_list, pipe: I2VGenXLPipeline, inverse_scheduler, g):
@@ -77,7 +79,7 @@ def ddim_sampling(
     return reconstructed_video
 
 
-def main(template_config, configs_list):
+def main(template_config, configs_list,run_all=False,samples=50):
     # Initialize the pipeline
     pipe = I2VGenXLPipeline.from_pretrained(
         "ali-vilab/i2vgen-xl",
@@ -102,6 +104,20 @@ def main(template_config, configs_list):
     video_dir = template_config.video_dir
     assert os.path.exists(video_dir), f"video_dir: {video_dir} does not exist"
     # loop through the video_dir and process every mp4 file
+    # breakpoint()
+    if run_all:
+        config_template=configs_list[0]
+        configs_list=[]
+        
+        video_list = natsorted(os.listdir(video_dir))
+        if samples>0 and len(video_list)>samples:
+            video_list=video_list[:samples]
+        # extend the configs_list with the video_list
+        for video_name in video_list:
+            config_entry=OmegaConf.merge(config_template,OmegaConf.create({"video_name":video_name}))
+            configs_list.append(config_entry)
+    
+    
     for config_entry in configs_list:
         if config_entry["active"] == False:
             logger.info(f"Skipping config_entry: {config_entry}")
@@ -111,6 +127,7 @@ def main(template_config, configs_list):
         # Override the config with the data_meta_entry
         config = OmegaConf.merge(template_config, OmegaConf.create(config_entry))
 
+        
         config.video_path = os.path.join(config.video_dir, config.video_name + ".mp4")
         config.video_frames_path = os.path.join(config.video_dir, config.video_name)
 
@@ -124,7 +141,9 @@ def main(template_config, configs_list):
         # This is the same as run_ddim_inversion.py
         try:
             logger.info(f"Loading frames from: {config.video_frames_path}")
-            _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, config.image_size)
+            # breakpoint()
+            naming_scheme=config.naming_scheme
+            _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, config.image_size,naming_scheme=naming_scheme)
         except:
             logger.error(f"Failed to load frames from: {config.video_frames_path}")
             logger.info(f"Converting mp4 video to frames: {config.video_path}")
@@ -194,9 +213,10 @@ def main(template_config, configs_list):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--template_config", type=str, default="./configs/group_ddim_inversion/template.yaml")
-    parser.add_argument("--configs_json", type=str, default="./configs/group_config.json") # This is going to override the template_config
-
+    parser.add_argument("--template_config", type=str, default="./configs/group_ddim_inversion/template_common.yaml")
+    parser.add_argument("--configs_json", type=str, default="./configs/group_config_common.json") # This is going to override the template_config
+    parser.add_argument("--run_all", action="store_true",default=True, help="Run all the videos in the video_dir")
+    parser.add_argument("--samples", type=int, default=50)
     args = parser.parse_args()
     template_config = OmegaConf.load(args.template_config)
 
@@ -217,4 +237,4 @@ if __name__ == "__main__":
     device = torch.device(template_config.device)
     torch.set_grad_enabled(False)
     seed_everything(template_config.seed)
-    main(template_config, configs_list)
+    main(template_config, configs_list,run_all=args.run_all,samples=args.samples)

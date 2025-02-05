@@ -7,6 +7,7 @@ import logging
 from omegaconf import OmegaConf
 from PIL import Image
 import json
+from natsort import natsorted
 
 # HF imports
 from diffusers import (
@@ -23,7 +24,7 @@ from utils import (
     load_ddim_latents_at_T,
     load_ddim_latents_at_t,
 )
-from pipelines.pipeline_i2vgen_xl import I2VGenXLPipeline
+from pipelines.pipeline_i2vgen_xl_ori import I2VGenXLPipeline
 from pnp_utils import (
     register_time,
     register_conv_injection,
@@ -56,7 +57,7 @@ def init_pnp(pipe, scheduler, config):
     logger.debug(f"temp_attn_qk_injection_timesteps: {temp_attn_qk_injection_timesteps}")
 
 
-def main(template_config, configs_list):
+def main(template_config, configs_list,run_all=False,samples=50):
     # Initialize the pipeline
     pipe = I2VGenXLPipeline.from_pretrained(
         "ali-vilab/i2vgen-xl",
@@ -70,119 +71,140 @@ def main(template_config, configs_list):
         "ali-vilab/i2vgen-xl",
         subfolder="scheduler",
     )
+    video_dir = template_config.video_dir
+    edited_frames_dir = template_config.edited_frames_dir
+    if run_all:
+        config_template=configs_list[0]
+        configs_list=[]
+        
+        video_list = natsorted(os.listdir(video_dir))
+        if samples>0 and len(video_list)>samples:
+            video_list=video_list[:samples]
+        # extend the configs_list with the video_list
+        for video_name in video_list:
+            config_entry=OmegaConf.merge(config_template,OmegaConf.create({"video_name":video_name}))
+            edited_first_frame_path=os.path.join(edited_frames_dir,video_name,f"%0{template_config.naming_scheme}d.png"%0)
+            config_entry.edited_first_frame_path=edited_first_frame_path
+            configs_list.append(config_entry)
+        # breakpoint()
 
     for config_entry in configs_list:
-        if config_entry["active"] == False:
-            logger.info(f"Skipping config_entry: {config_entry}")
-            continue
-        logger.info(f"Processing config_entry: {config_entry}")
-
-        # Override the config with the data_meta_entry
-        config = OmegaConf.merge(template_config, OmegaConf.create(config_entry))
-
-        # Update the related paths to absolute paths
-        config.video_path = os.path.join(config.video_dir, config.video_name + ".mp4")
-        config.video_frames_path = os.path.join(config.video_dir, config.video_name)
-        config.edited_first_frame_path = os.path.join(config.data_dir, config.edited_first_frame_path)
-        logger.info(f"config: {OmegaConf.to_yaml(config)}")
-
-        # Check if there are fields contain "ReplaceMe"
-        for k, v in config.items():
-            if "ReplaceMe" in str(v):
-                logger.error(f"Field {k} contains 'ReplaceMe'")
-                continue
-
-        # This is the same as run_pnp_edit.py
-        # Load first frame and source frames
         try:
-            logger.info(f"Loading frames from: {config.video_frames_path}")
-            _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, config.image_size)
-        except:
-            logger.error(f"Failed to load frames from: {config.video_frames_path}")
-            logger.info(f"Converting mp4 video to frames: {config.video_path}")
-            frame_list = convert_video_to_frames(config.video_path, config.image_size, save_frames=True)
-            frame_list = frame_list[: config.n_frames]  # 16 frames for img2vid
-            logger.debug(f"len(frame_list): {len(frame_list)}")
-        src_frame_list = frame_list
-        src_1st_frame = src_frame_list[0]  # Is a PIL image
+            if config_entry["active"] == False:
+                logger.info(f"Skipping config_entry: {config_entry}")
+                continue
+            logger.info(f"Processing config_entry: {config_entry}")
 
-        # Load the edited first frame
-        edited_1st_frame = load_image(config.edited_first_frame_path)
-        edited_1st_frame = edited_1st_frame.resize(config.image_size, resample=Image.Resampling.LANCZOS)
+            # Override the config with the data_meta_entry
+            config = OmegaConf.merge(template_config, OmegaConf.create(config_entry))
 
-        # Load the initial latents at t
-        ddim_init_latents_t_idx = config.ddim_init_latents_t_idx
-        ddim_scheduler.set_timesteps(config.n_steps)
-        logger.info(f"ddim_scheduler.timesteps: {ddim_scheduler.timesteps}")
-        ddim_latents_at_t = load_ddim_latents_at_t(
-            ddim_scheduler.timesteps[ddim_init_latents_t_idx], ddim_latents_path=config.ddim_latents_path
-        )
-        logger.debug(f"ddim_scheduler.timesteps[t_idx]: {ddim_scheduler.timesteps[ddim_init_latents_t_idx]}")
-        logger.debug(f"ddim_latents_at_t.shape: {ddim_latents_at_t.shape}")
+            # Update the related paths to absolute paths
+            config.video_path = os.path.join(config.video_dir, config.video_name + ".mp4")
+            config.video_frames_path = os.path.join(config.video_dir, config.video_name)
+            config.edited_first_frame_path = os.path.join(config.data_dir, config.edited_first_frame_path)
+            logger.info(f"config: {OmegaConf.to_yaml(config)}")
 
-        # Blend the latents
-        random_latents = torch.randn_like(ddim_latents_at_t)
-        logger.info(f"Blending random_ratio (1 means random latent): {config.random_ratio}")
-        mixed_latents = random_latents * config.random_ratio + ddim_latents_at_t * (1 - config.random_ratio)
+            # Check if there are fields contain "ReplaceMe"
+            for k, v in config.items():
+                if "ReplaceMe" in str(v):
+                    logger.error(f"Field {k} contains 'ReplaceMe'")
+                    continue
 
-        # Init Pnp
-        init_pnp(pipe, ddim_scheduler, config)
+            # This is the same as run_pnp_edit.py
+            # Load first frame and source frames
+            try:
+                logger.info(f"Loading frames from: {config.video_frames_path}")
+                naming_scheme=config.naming_scheme
+                _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, config.image_size,naming_scheme=naming_scheme)
+            except:
+                logger.error(f"Failed to load frames from: {config.video_frames_path}")
+                logger.info(f"Converting mp4 video to frames: {config.video_path}")
+                frame_list = convert_video_to_frames(config.video_path, config.image_size, save_frames=True)
+                frame_list = frame_list[: config.n_frames]  # 16 frames for img2vid
+                logger.debug(f"len(frame_list): {len(frame_list)}")
+            src_frame_list = frame_list
+            src_1st_frame = src_frame_list[0]  # Is a PIL image
 
-        # Edit video
-        pipe.register_modules(scheduler=ddim_scheduler)
-        edited_video = pipe.sample_with_pnp(
-            prompt=config.editing_prompt,
-            image=edited_1st_frame,
-            height=config.image_size[1],
-            width=config.image_size[0],
-            num_frames=config.n_frames,
-            num_inference_steps=config.n_steps,
-            guidance_scale=config.cfg,
-            negative_prompt=config.editing_negative_prompt,
-            target_fps=config.target_fps,
-            latents=mixed_latents,
-            generator=torch.manual_seed(config.seed),
-            return_dict=True,
-            ddim_init_latents_t_idx=ddim_init_latents_t_idx,
-            ddim_inv_latents_path=config.ddim_latents_path,
-            ddim_inv_prompt=config.ddim_inv_prompt,
-            ddim_inv_1st_frame=src_1st_frame,
-        ).frames[0]
+            # Load the edited first frame
+            # breakpoint()
+            edited_1st_frame = load_image(config.edited_first_frame_path)
+            edited_1st_frame = edited_1st_frame.resize(config.image_size, resample=Image.Resampling.LANCZOS)
 
-        # Save video
-        # Add the config to the output_dir, TODO: make this more elegant
-        config_suffix = (
-            "ddim_init_latents_t_idx_"
-            + str(ddim_init_latents_t_idx)
-            + "_nsteps_"
-            + str(config.n_steps)
-            + "_cfg_"
-            + str(config.cfg)
-            + "_pnpf"
-            + str(config.pnp_f_t)
-            + "_pnps"
-            + str(config.pnp_spatial_attn_t)
-            + "_pnpt"
-            + str(config.pnp_temp_attn_t)
-        )
-        output_dir = os.path.join(config.output_dir, config_suffix)
-        os.makedirs(output_dir, exist_ok=True)
-        edited_video = [frame.resize(config.image_size, resample=Image.LANCZOS) for frame in edited_video]
-        # Downsampling the video for space saving
-        # edited_video = [frame.resize((512, 512), resample=Image.LANCZOS) for frame in edited_video]
-        # if config.pnp_f_t == 0.0 and config.pnp_spatial_attn_t == 0.0 and config.pnp_temp_attn_t == 0.0:
-        #     edited_video_file_name = "ddim_edit"
-        # else:
-        #     edited_video_file_name = "pnp_edit"
-        edited_video_file_name = "video"
-        export_to_video(edited_video, os.path.join(output_dir, f"{edited_video_file_name}.mp4"), fps=config.target_fps)
-        export_to_gif(edited_video, os.path.join(output_dir, f"{edited_video_file_name}.gif"))
-        logger.info(f"Saved video to: {os.path.join(output_dir, f'{edited_video_file_name}.mp4')}")
-        logger.info(f"Saved gif to: {os.path.join(output_dir, f'{edited_video_file_name}.gif')}")
-        for i, frame in enumerate(edited_video):
-            frame.save(os.path.join(output_dir, f"{edited_video_file_name}_{i:05d}.png"))
-            logger.info(f"Saved frames to: {os.path.join(output_dir, f'{edited_video_file_name}_{i:05d}.png')}")
+            # Load the initial latents at t
+            ddim_init_latents_t_idx = config.ddim_init_latents_t_idx
+            ddim_scheduler.set_timesteps(config.n_steps)
+            logger.info(f"ddim_scheduler.timesteps: {ddim_scheduler.timesteps}")
+            ddim_latents_at_t = load_ddim_latents_at_t(
+                ddim_scheduler.timesteps[ddim_init_latents_t_idx], ddim_latents_path=config.ddim_latents_path
+            )
+            logger.debug(f"ddim_scheduler.timesteps[t_idx]: {ddim_scheduler.timesteps[ddim_init_latents_t_idx]}")
+            logger.debug(f"ddim_latents_at_t.shape: {ddim_latents_at_t.shape}")
 
+            # Blend the latents
+            random_latents = torch.randn_like(ddim_latents_at_t)
+            logger.info(f"Blending random_ratio (1 means random latent): {config.random_ratio}")
+            mixed_latents = random_latents * config.random_ratio + ddim_latents_at_t * (1 - config.random_ratio)
+
+            # Init Pnp
+            init_pnp(pipe, ddim_scheduler, config)
+
+            # Edit video
+            pipe.register_modules(scheduler=ddim_scheduler)
+            edited_video = pipe.sample_with_pnp(
+                prompt=config.editing_prompt,
+                image=edited_1st_frame,
+                height=config.image_size[1],
+                width=config.image_size[0],
+                num_frames=config.n_frames,
+                num_inference_steps=config.n_steps,
+                guidance_scale=config.cfg,
+                negative_prompt=config.editing_negative_prompt,
+                target_fps=config.target_fps,
+                latents=mixed_latents,
+                generator=torch.manual_seed(config.seed),
+                return_dict=True,
+                ddim_init_latents_t_idx=ddim_init_latents_t_idx,
+                ddim_inv_latents_path=config.ddim_latents_path,
+                ddim_inv_prompt=config.ddim_inv_prompt,
+                ddim_inv_1st_frame=src_1st_frame,
+            ).frames[0]
+
+            # Save video
+            # Add the config to the output_dir, TODO: make this more elegant
+            config_suffix = (
+                "ddim_init_latents_t_idx_"
+                + str(ddim_init_latents_t_idx)
+                + "_nsteps_"
+                + str(config.n_steps)
+                + "_cfg_"
+                + str(config.cfg)
+                + "_pnpf"
+                + str(config.pnp_f_t)
+                + "_pnps"
+                + str(config.pnp_spatial_attn_t)
+                + "_pnpt"
+                + str(config.pnp_temp_attn_t)
+            )
+            output_dir = os.path.join(config.output_dir, config_suffix)
+            os.makedirs(output_dir, exist_ok=True)
+            edited_video = [frame.resize(config.image_size, resample=Image.LANCZOS) for frame in edited_video]
+            # Downsampling the video for space saving
+            # edited_video = [frame.resize((512, 512), resample=Image.LANCZOS) for frame in edited_video]
+            # if config.pnp_f_t == 0.0 and config.pnp_spatial_attn_t == 0.0 and config.pnp_temp_attn_t == 0.0:
+            #     edited_video_file_name = "ddim_edit"
+            # else:
+            #     edited_video_file_name = "pnp_edit"
+            edited_video_file_name = "video"
+            export_to_video(edited_video, os.path.join(output_dir, f"{edited_video_file_name}.mp4"), fps=config.target_fps)
+            export_to_gif(edited_video, os.path.join(output_dir, f"{edited_video_file_name}.gif"))
+            logger.info(f"Saved video to: {os.path.join(output_dir, f'{edited_video_file_name}.mp4')}")
+            logger.info(f"Saved gif to: {os.path.join(output_dir, f'{edited_video_file_name}.gif')}")
+            for i, frame in enumerate(edited_video):
+                frame.save(os.path.join(output_dir, f"{edited_video_file_name}_{i:05d}.png"))
+                logger.info(f"Saved frames to: {os.path.join(output_dir, f'{edited_video_file_name}_{i:05d}.png')}")
+        except Exception as e:
+            logger.error(f"Failed to process config_entry: {config_entry}")
+            logger.error(e)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -190,7 +212,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "--configs_json", type=str, default="./configs/group_config.json"
     )  # This is going to override the template_config
-
+    parser.add_argument("--run_all", action="store_true",default=True, help="Run all the videos in the video_dir")
+    parser.add_argument("--samples", type=int, default=50)
     args = parser.parse_args()
     template_config = OmegaConf.load(args.template_config)
 
@@ -211,4 +234,4 @@ if __name__ == "__main__":
     device = torch.device(template_config.device)
     torch.set_grad_enabled(False)
     seed_everything(template_config.seed)
-    main(template_config, configs_list)
+    main(template_config, configs_list,run_all=args.run_all,samples=args.samples)

@@ -29,8 +29,7 @@ from utils import (
     load_ddim_latents_at_T,
     load_ddim_latents_at_t,
 )
-from pipelines.pipeline_i2vgen_xl import I2VGenXLPipeline
-from pipelines.unet_i2vgen_xl2 import I2VGenXLUNet2
+from pipelines.pipeline_i2vgen_xl_ori import I2VGenXLPipeline
 from run_group_ddim_inversion import ddim_inversion, ddim_sampling
 
 
@@ -52,7 +51,7 @@ output_dir = "../demo/An Old Man Doing Exercises For The Body And Mind/edited_fi
 config = {
     # General
     "seed": 8888,
-    "device": "cuda:1",  # <-- change this to the GPU you want to use
+    "device": "cuda:2",  # <-- change this to the GPU you want to use
     "debug": False,  # For logging DEBUG level messages otherwise INFO
 
     # Dir
@@ -124,12 +123,7 @@ pipe = I2VGenXLPipeline.from_pretrained(
         torch_dtype=torch.float16,
         variant="fp16",
 )
-custom_unet = I2VGenXLUNet2(**pipe.unet.config)
-custom_unet.load_state_dict(pipe.unet.state_dict()) 
-custom_unet=custom_unet.to(torch.float16)
-pipe.unet = custom_unet 
-
-device="cuda:1"
+device="cuda:2"
 pipe.to(device)
 g = torch.Generator(device=device)
 g = g.manual_seed(config.seed)
@@ -207,22 +201,19 @@ config = {
     "data_dir": "/home/sanoojan/Video_diffusion/AnyV2V",  # <-- change this to the path of the data directory, if you cloned the repo, leave it as "..", the inversion latents will be saved in AnyV2V/
     "model_name": "i2vgen-xl",
     "task_name": "Prompt-Based-Editing",
-    "edited_video_name": "Yann is doing exercises for the body and mind 10 frames_w_emb_wo_latents",
+    "edited_video_name": "Yann is exersising",
     "output_dir": "${data_dir}/Results/${task_name}/${model_name}/${video_name}/${edited_video_name}/",
 
     # Data
     "image_size": [512,512],
     "video_dir": "${data_dir}/demo",
-    # "video_name":"A guy reading the news",
-    "video_name": "An Old Man Doing Exercises For The Body And Mind",
+    "video_name":"An Old Man Doing Exercises For The Body And Mind",
     "video_frames_path": "${video_dir}/${video_name}",
-    "edited_first_frame_path":"${data_dir}/demo/An Old Man Doing Exercises For The Body And Mind/edited_first_frame/yann_lecunn.png",
-    "edited_frames_path":"${data_dir}/demo/An Old Man Doing Exercises For The Body And Mind/edited_first_frame/Yann",
+    "edited_first_frame_path":"${data_dir}/demo/An Old Man Doing Exercises For The Body And Mind/edited_first_frame/Yann/000000000000.png",
     "ddim_latents_path": "${data_dir}/inversions/${model_name}/${video_name}/ddim_latents",  # Same as inverse_config.output_dir
 
     # Pnp Editing
     "n_frames": 16,
-    "n_edited_frames": 10,
     "cfg": 9.0,
     "target_fps": 8,
     
@@ -262,14 +253,6 @@ src_1st_frame = src_frame_list[0]  # Is a PIL image
 edited_1st_frame = load_image(config.edited_first_frame_path)
 edited_1st_frame = edited_1st_frame.resize(config.image_size, resample=Image.Resampling.LANCZOS)
 
-# Load the edited frames
-edited_frame_list = []
-num_frames_available = min(config.n_edited_frames, config.n_frames, len(os.listdir(config.edited_frames_path)))
-for i in range(num_frames_available):
-    edited_frame = load_image(os.path.join(config.edited_frames_path, f"{i:012d}.png"))
-    edited_frame = edited_frame.resize(config.image_size, resample=Image.Resampling.LANCZOS)
-    edited_frame_list.append(edited_frame)
-
 # Load the initial latents at t
 ddim_init_latents_t_idx = config.ddim_init_latents_t_idx
 ddim_scheduler.set_timesteps(config.n_steps)
@@ -293,7 +276,6 @@ pipe.register_modules(scheduler=ddim_scheduler)
 edited_video = pipe.sample_with_pnp(
             prompt=config.editing_prompt,
             image=edited_1st_frame,
-            edited_images=edited_frame_list,
             height=config.image_size[1],
             width=config.image_size[0],
             num_frames=config.n_frames,
