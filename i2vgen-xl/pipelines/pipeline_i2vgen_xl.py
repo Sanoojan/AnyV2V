@@ -26,8 +26,8 @@ from diffusers.image_processor import PipelineImageInput, VaeImageProcessor
 from diffusers.loaders import LoraLoaderMixin
 from diffusers.models import AutoencoderKL
 from diffusers.models.lora import adjust_lora_scale_text_encoder
-from .unet_i2vgen_xl2 import I2VGenXLUNet2
-from diffusers.models.unets.unet_i2vgen_xl import I2VGenXLUNet
+from .unet_i2vgen_xl2 import I2VGenXLUNet2 as I2VGenXLUNet
+# from diffusers.models.unets.unet_i2vgen_xl import I2VGenXLUNet
 from diffusers.schedulers import DDIMScheduler
 from diffusers.utils import (
     USE_PEFT_BACKEND,

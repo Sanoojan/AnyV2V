@@ -15,7 +15,7 @@ from diffusers import (
     DDIMScheduler,
 )
 from diffusers.utils import load_image, export_to_video, export_to_gif
-
+from pipelines.unet_i2vgen_xl2 import I2VGenXLUNet2
 # Project imports
 from utils import (
     seed_everything,
@@ -24,7 +24,7 @@ from utils import (
     load_ddim_latents_at_T,
     load_ddim_latents_at_t,
 )
-from pipelines.pipeline_i2vgen_xl_ori import I2VGenXLPipeline
+from pipelines.pipeline_i2vgen_xl import I2VGenXLPipeline
 from pnp_utils import (
     register_time,
     register_conv_injection,
@@ -64,6 +64,11 @@ def main(template_config, configs_list,run_all=False,samples=50):
         torch_dtype=torch.float16,
         variant="fp16",
     )
+    custom_unet = I2VGenXLUNet2(**pipe.unet.config)
+    custom_unet.load_state_dict(pipe.unet.state_dict()) 
+    custom_unet=custom_unet.to(torch.float16)
+    pipe.unet = custom_unet 
+    
     pipe.to(device)
 
     # Initialize the DDIM scheduler
@@ -83,8 +88,9 @@ def main(template_config, configs_list,run_all=False,samples=50):
         # extend the configs_list with the video_list
         for video_name in video_list:
             config_entry=OmegaConf.merge(config_template,OmegaConf.create({"video_name":video_name}))
-            edited_first_frame_path=os.path.join(edited_frames_dir,video_name,f"%0{template_config.naming_scheme}d.png"%0)
+            edited_first_frame_path=os.path.join(edited_frames_dir,video_name,f"{template_config.edit_name_prefix}%0{template_config.edit_naming_scheme}d.{template_config.edit_image_format}"%0)
             config_entry.edited_first_frame_path=edited_first_frame_path
+            config_entry.edited_frames_path=os.path.join(edited_frames_dir,video_name)
             configs_list.append(config_entry)
         # breakpoint()
 
@@ -102,6 +108,7 @@ def main(template_config, configs_list,run_all=False,samples=50):
             config.video_path = os.path.join(config.video_dir, config.video_name + ".mp4")
             config.video_frames_path = os.path.join(config.video_dir, config.video_name)
             config.edited_first_frame_path = os.path.join(config.data_dir, config.edited_first_frame_path)
+            config.edited_frames_path = os.path.join(config.data_dir, config.edited_frames_path)
             logger.info(f"config: {OmegaConf.to_yaml(config)}")
 
             # Check if there are fields contain "ReplaceMe"
@@ -130,6 +137,17 @@ def main(template_config, configs_list,run_all=False,samples=50):
             edited_1st_frame = load_image(config.edited_first_frame_path)
             edited_1st_frame = edited_1st_frame.resize(config.image_size, resample=Image.Resampling.LANCZOS)
 
+            
+            edited_frame_list = []
+            num_frames_available = min(config.n_edited_frames, config.n_frames, len(os.listdir(config.edited_frames_path)))
+            for i in range(num_frames_available):
+                
+                edited_frame = load_image(os.path.join(config.edited_frames_path, f"{config.edit_name_prefix}{i:0{config.edit_naming_scheme}d}.{config.edit_image_format}"))
+                edited_frame = edited_frame.resize(config.image_size, resample=Image.Resampling.LANCZOS)
+                edited_frame_list.append(edited_frame)
+
+            
+            
             # Load the initial latents at t
             ddim_init_latents_t_idx = config.ddim_init_latents_t_idx
             ddim_scheduler.set_timesteps(config.n_steps)
@@ -151,22 +169,23 @@ def main(template_config, configs_list,run_all=False,samples=50):
             # Edit video
             pipe.register_modules(scheduler=ddim_scheduler)
             edited_video = pipe.sample_with_pnp(
-                prompt=config.editing_prompt,
-                image=edited_1st_frame,
-                height=config.image_size[1],
-                width=config.image_size[0],
-                num_frames=config.n_frames,
-                num_inference_steps=config.n_steps,
-                guidance_scale=config.cfg,
-                negative_prompt=config.editing_negative_prompt,
-                target_fps=config.target_fps,
-                latents=mixed_latents,
-                generator=torch.manual_seed(config.seed),
-                return_dict=True,
-                ddim_init_latents_t_idx=ddim_init_latents_t_idx,
-                ddim_inv_latents_path=config.ddim_latents_path,
-                ddim_inv_prompt=config.ddim_inv_prompt,
-                ddim_inv_1st_frame=src_1st_frame,
+                    prompt=config.editing_prompt,
+                    image=edited_1st_frame,
+                    edited_images=edited_frame_list,
+                    height=config.image_size[1],
+                    width=config.image_size[0],
+                    num_frames=config.n_frames,
+                    num_inference_steps=config.n_steps,
+                    guidance_scale=config.cfg,
+                    negative_prompt=config.editing_negative_prompt,
+                    target_fps=config.target_fps,
+                    latents=mixed_latents,
+                    generator=torch.manual_seed(config.seed),
+                    return_dict=True,
+                    ddim_init_latents_t_idx=ddim_init_latents_t_idx,
+                    ddim_inv_latents_path=config.ddim_latents_path,
+                    ddim_inv_prompt=config.ddim_inv_prompt,
+                    ddim_inv_1st_frame=src_1st_frame,
             ).frames[0]
 
             # Save video

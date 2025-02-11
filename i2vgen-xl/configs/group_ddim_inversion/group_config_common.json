@@ -2,7 +2,7 @@
 [
     {
       "active": true,
-      "force_recompute_latents": true,
+      "force_recompute_latents": false,
       "video_name":"ReplaceMe",
       "image_size": [512, 512],
       "recon_config":

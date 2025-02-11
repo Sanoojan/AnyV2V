@@ -31,32 +31,72 @@
 
 import cv2
 import os
+from natsort import natsorted
 
-# Define the folder containing the frames and the output MP4 path
-input_folder = "demo/A guy reading the news"  # Replace with the path to your folder
-output_video = "demo/news_reading.mp4"             # Name of the output video
-fps = 8                                # Frames per second
+main_folder_path="data/Data/VFHQ-Test/GT/Interval1_512x512_LANCZOS4"
+main_video_path="data/Data/VFHQ-Test/GT/Vid_Interval1_512x512_LANCZOS4"
 
-# Get a sorted list of image files in the folder
-image_files = sorted([os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(('.png', '.jpg'))])
+for folder in os.listdir(main_folder_path):
+    input_folder = os.path.join(main_folder_path,folder)
+    output_video = os.path.join(main_video_path,folder,"vid.mp4")
+    
+    if not os.path.exists(os.path.join(main_video_path,folder)):
+        os.makedirs(os.path.join(main_video_path,folder))
+        
+    
+    fps = 20                               # Frames per second
 
-# Select the first 50 images
-selected_images = image_files[:32]
+    # Get a sorted list of image files in the folder
+    image_files = natsorted([os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(('.png', '.jpg'))])
 
-# Read the first image to get video dimensions
-first_frame = cv2.imread(selected_images[0])
-height, width, channels = first_frame.shape
+    # Select the first 50 images
+    selected_images = image_files[:32]
 
-# Define the codec and create a VideoWriter object
-fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for MP4 format
-video_writer = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
+    # Read the first image to get video dimensions
+    first_frame = cv2.imread(selected_images[0])
+    height, width, channels = first_frame.shape
 
-# Write each frame to the video
-for image_file in selected_images:
-    frame = cv2.imread(image_file)
-    video_writer.write(frame)
+    # Define the codec and create a VideoWriter object
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for MP4 format
+    video_writer = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
 
-# Release the video writer
-video_writer.release()
+    # Write each frame to the video
+    for image_file in selected_images:
+        frame = cv2.imread(image_file)
+        video_writer.write(frame)
 
-print(f"MP4 video saved as '{output_video}' with {fps} FPS")
+    # Release the video writer
+    video_writer.release()
+
+    print(f"MP4 video saved as '{output_video}' with {fps} FPS")
+    # if True :
+    #     break
+
+# # Define the folder containing the frames and the output MP4 path
+# input_folder = "demo/A guy reading the news"  # Replace with the path to your folder
+# output_video = "demo/news_reading.mp4"             # Name of the output video
+# fps = 8                                # Frames per second
+
+# # Get a sorted list of image files in the folder
+# image_files = natsorted([os.path.join(input_folder, f) for f in os.listdir(input_folder) if f.endswith(('.png', '.jpg'))])
+
+# # Select the first 50 images
+# selected_images = image_files[:32]
+
+# # Read the first image to get video dimensions
+# first_frame = cv2.imread(selected_images[0])
+# height, width, channels = first_frame.shape
+
+# # Define the codec and create a VideoWriter object
+# fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for MP4 format
+# video_writer = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
+
+# # Write each frame to the video
+# for image_file in selected_images:
+#     frame = cv2.imread(image_file)
+#     video_writer.write(frame)
+
+# # Release the video writer
+# video_writer.release()
+
+# print(f"MP4 video saved as '{output_video}' with {fps} FPS")
