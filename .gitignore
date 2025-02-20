@@ -168,3 +168,4 @@ demo/News_reading/*
 demo/*
 Edited_frames/*
 eval_tool/Deep3DFaceRecon_pytorch_edit/BFM/*.mat
+Results_full/*

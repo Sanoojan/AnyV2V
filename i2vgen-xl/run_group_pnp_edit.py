@@ -204,7 +204,8 @@ def main(template_config, configs_list,run_all=False,samples=50):
                 + "_pnpt"
                 + str(config.pnp_temp_attn_t)
             )
-            output_dir = os.path.join(config.output_dir, config_suffix)
+            # output_dir = os.path.join(config.output_dir, config_suffix)
+            output_dir=config.output_dir
             os.makedirs(output_dir, exist_ok=True)
             edited_video = [frame.resize(config.image_size, resample=Image.LANCZOS) for frame in edited_video]
             # Downsampling the video for space saving

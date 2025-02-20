@@ -2,7 +2,7 @@
 
 # General
 seed: 8888
-device: "cuda:3" # <-- change this to the GPU you want to use
+device: "cuda:2" # <-- change this to the GPU you want to use
 debug: False # For logging DEBUG level messages otherwise INFO
 
 # Dir
@@ -10,12 +10,16 @@ data_dir: ".."  # <-- change this to the path of the data directory, if you clon
 model_name: "i2vgen-xl"
 task_name: "Prompt-Based-Editing"
 edited_video_name: "ReplaceMe"
-output_dir: "${data_dir}/Results/${task_name}/${model_name}/${video_name}/${edited_video_name}/"
+output_dir: "${data_dir}/Results_full/${task_name}/${model_name}/${edited_video_name}/${video_name}/"
 
 # Data
 image_size: [512, 512]
 video_dir: "${data_dir}/data/Data/VFHQ-Test/GT/Interval1_512x512_LANCZOS4"
-edited_frames_dir: "Edited_frames/SimSwap"
+edited_frames_dir: "Edited_frames/REFace"
+edit_name_prefix: ""
+edit_image_format: "png"
+naming_scheme: 8
+edit_naming_scheme: 8
 # edited_frames_dir: "data/Data/VFHQ-Test/GT/Interval1_512x512_LANCZOS4"
 video_name: "ReplaceMe"
 video_path: "ReplaceMe"
@@ -23,10 +27,8 @@ video_frames_path: "ReplaceMe"
 edited_first_frame_path: "ReplaceMe"
 edited_frames_path: "ReplaceMe"
 ddim_latents_path: "${data_dir}/inversions/${model_name}/${video_name}/ddim_latents" # Same as inverse_config.output_dir
-naming_scheme: 8
-edit_naming_scheme: 7
-edit_name_prefix: "frame_"
-edit_image_format: "jpg"
+
+
 
 
 # Pnp Editing
