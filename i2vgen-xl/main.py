@@ -47,10 +47,10 @@ def main(config_path):
 
     # Initialize pipeline
     pipe = I2VGenXLPipeline.from_pretrained("ali-vilab/i2vgen-xl", torch_dtype=torch.float16, variant="fp16")
-    custom_unet = I2VGenXLUNet2(**pipe.unet.config)
-    custom_unet.load_state_dict(pipe.unet.state_dict())
-    custom_unet = custom_unet.to(torch.float16)
-    pipe.unet = custom_unet
+    # custom_unet = I2VGenXLUNet2(**pipe.unet.config)
+    # custom_unet.load_state_dict(pipe.unet.state_dict())
+    # custom_unet = custom_unet.to(torch.float16)
+    # pipe.unet = custom_unet
     pipe.to(device)
     g = torch.Generator(device=device).manual_seed(config.seed)
 
@@ -81,6 +81,11 @@ def main(config_path):
         export_to_gif(reconstructed_video, os.path.join(config.output_dir, "ddim_reconstruction.gif"))
         logger.info(f"Saved reconstructed video to {config.output_dir}")
 
+    
+    
+    src_frame_list = frame_list # Loaded from step 1
+    src_1st_frame = src_frame_list[0]  # Is a PIL image 
+    
     # Load edited first frame and frames
     edited_1st_frame = load_image(config.edited_first_frame_path).resize(config.image_size, resample=Image.LANCZOS)
     edited_frames = [
@@ -119,6 +124,8 @@ def main(config_path):
         return_dict=True,
         ddim_init_latents_t_idx=config.editing.ddim_init_latents_t_idx,
         ddim_inv_latents_path=config.ddim_latents_path,
+        ddim_inv_prompt=config.editing.ddim_inv_prompt,
+        ddim_inv_1st_frame=src_1st_frame,
     ).frames[0]
 
     # Save edited video
