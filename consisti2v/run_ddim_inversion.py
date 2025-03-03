@@ -85,7 +85,7 @@ def main(config):
     # TODO: do we need the get_inverse_timesteps function?
     pipe = ConditionalVideoEditingPipeline.from_pretrained(
         "TIGER-Lab/ConsistI2V",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
     )
     # TODO: set the model to GPU and eval mode
     pipe.to(device)

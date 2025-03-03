@@ -52,7 +52,7 @@ EXAMPLE_DOC_STRING = """
         >>> import torch
         >>> from diffusers import I2VGenXLPipeline
 
-        >>> pipeline = I2VGenXLPipeline.from_pretrained("ali-vilab/i2vgen-xl", torch_dtype=torch.float16, variant="fp16")
+        >>> pipeline = I2VGenXLPipeline.from_pretrained("ali-vilab/i2vgen-xl", torch_dtype=torch.float32, variant="fp16")
         >>> pipeline.enable_model_cpu_offload()
 
         >>> image_url = "https://github.com/ali-vilab/i2vgen-xl/blob/main/data/test_images/img_0009.png?raw=true"
@@ -458,7 +458,7 @@ class I2VGenXLPipeline(DiffusionPipeline):
         decode_shape = (batch_size, num_frames, -1) + image.shape[2:]
         video = image[None, :].reshape(decode_shape).permute(0, 2, 1, 3, 4)
 
-        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat16
+        # we always cast to float32 as this does not cause significant overhead and is compatible with bfloat32
         video = video.float()
         return video
 

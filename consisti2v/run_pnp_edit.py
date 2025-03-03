@@ -55,7 +55,7 @@ def main(config):
     # Initialize the pipeline
     pipe = ConditionalVideoEditingPipeline.from_pretrained(
         "TIGER-Lab/ConsistI2V",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
     )
     pipe.to(device)
 

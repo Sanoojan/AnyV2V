@@ -121,12 +121,12 @@ _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, con
 # Initialize the pipeline
 pipe = I2VGenXLPipeline.from_pretrained(
         "ali-vilab/i2vgen-xl",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         variant="fp16",
 )
 custom_unet = I2VGenXLUNet2(**pipe.unet.config)
 custom_unet.load_state_dict(pipe.unet.state_dict()) 
-custom_unet=custom_unet.to(torch.float16)
+custom_unet=custom_unet.to(torch.float32)
 pipe.unet = custom_unet 
 
 device="cuda:1"

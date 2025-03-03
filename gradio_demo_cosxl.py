@@ -94,7 +94,7 @@ class AnyV2V_I2VGenXL:
         # Initialize the I2VGenXL pipeline
         self.pipe = I2VGenXLPipeline.from_pretrained(
             "ali-vilab/i2vgen-xl",
-            torch_dtype=torch.float16,
+            torch_dtype=torch.float32,
             variant="fp16",
         ).to("cuda:0")
 

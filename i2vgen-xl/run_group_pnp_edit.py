@@ -61,12 +61,12 @@ def main(template_config, configs_list,run_all=False,samples=50):
     # Initialize the pipeline
     pipe = I2VGenXLPipeline.from_pretrained(
         "ali-vilab/i2vgen-xl",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         variant="fp16",
     )
     custom_unet = I2VGenXLUNet2(**pipe.unet.config)
     custom_unet.load_state_dict(pipe.unet.state_dict()) 
-    custom_unet=custom_unet.to(torch.float16)
+    custom_unet=custom_unet.to(torch.float32)
     pipe.unet = custom_unet 
     
     pipe.to(device)

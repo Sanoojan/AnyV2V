@@ -77,9 +77,9 @@ class SEINEPnPPipeline(nn.Module):
 
         if config.use_fp16:
             logger.info("Using FP16")
-            self.unet.to(dtype=torch.float16)
-            self.vae.to(dtype=torch.float16)
-            self.text_encoder.to(dtype=torch.float16)
+            self.unet.to(dtype=torch.float32)
+            self.vae.to(dtype=torch.float32)
+            self.text_encoder.to(dtype=torch.float32)
 
         # Create scheduler
         if config.sample_method == "ddim":
@@ -106,7 +106,7 @@ class SEINEPnPPipeline(nn.Module):
         # Load DDIM inversion latents and prompt
         self.ddim_latents_path = self.get_ddim_latents_path()
         ddim_latents_at_T = load_ddim_latents_at_T(self.ddim_latents_path)
-        self.ddim_latents_at_T = ddim_latents_at_T.to(torch.float16).to(self.device)
+        self.ddim_latents_at_T = ddim_latents_at_T.to(torch.float32).to(self.device)
         self.ddim_inversion_prompt = self.get_ddim_inversion_prompt()
         logger.info(f"ddim_inversion_prompt: {self.ddim_inversion_prompt}")
 
@@ -257,8 +257,8 @@ class SEINEPnPPipeline(nn.Module):
         # Generate mask
         mask = mask_generation_before("first1", video_input.shape, video_input.dtype, self.device)  # b,f,c,h,w
         masked_video = video_input * (mask == 0)
-        masked_video = masked_video.to(dtype=torch.float16)
-        mask = mask.to(dtype=torch.float16)
+        masked_video = masked_video.to(dtype=torch.float32)
+        mask = mask.to(dtype=torch.float32)
         logger.debug(f"video_input shape: {video_input.shape}")
         logger.debug(f"masked_video shape: {masked_video.shape}")
         logger.debug(f"mask shape: {mask.shape}")
@@ -312,7 +312,7 @@ class SEINEPnPPipeline(nn.Module):
             x_T = self.ddim_latents_at_T.to(self.device)
             logger.info(f"Init with ddim inversion")
         else:
-            x_T = torch.randn(1, self.latent_c, config.n_frames, self.latent_h, self.latent_w, dtype=torch.float16).to(self.device)
+            x_T = torch.randn(1, self.latent_c, config.n_frames, self.latent_h, self.latent_w, dtype=torch.float32).to(self.device)
             logger.info(f"Init with random noise")
 
         # Compute text embeddings
@@ -327,10 +327,10 @@ class SEINEPnPPipeline(nn.Module):
             logger.debug(f"text_prompt shape: {text_prompt.shape}")
 
         if config.use_fp16:
-            x_T = x_T.to(torch.float16)
-            mask = mask.to(torch.float16)
-            masked_1st_frame_edited_video = masked_1st_frame_edited_video.to(torch.float16)
-            masked_src_video = masked_src_video.to(torch.float16)
+            x_T = x_T.to(torch.float32)
+            mask = mask.to(torch.float32)
+            masked_1st_frame_edited_video = masked_1st_frame_edited_video.to(torch.float32)
+            masked_src_video = masked_src_video.to(torch.float32)
 
         x_0 = self.sample_loop(
             x_T.to(self.device),

@@ -524,7 +524,7 @@ class UNet3DConditionModel(ModelMixin, ConfigMixin):
         half = x[: len(x) // 2]
         combined = torch.cat([half, half], dim=0)
         if use_fp16:
-            combined = combined.to(dtype=torch.float16)
+            combined = combined.to(dtype=torch.float32)
         model_out = self.forward(combined, t, encoder_hidden_states, class_labels).sample
         # For exact reproducibility reasons, we apply classifier-free guidance on only
         # three channels by default. The standard approach to cfg applies it to all channels.

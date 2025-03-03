@@ -89,9 +89,9 @@ class SEINEDDIMInversionPipeline(nn.Module):
 
         if config.use_fp16:
             logger.info("Using FP16")
-            self.unet.to(dtype=torch.float16)
-            self.vae.to(dtype=torch.float16)
-            self.text_encoder.to(dtype=torch.float16)
+            self.unet.to(dtype=torch.float32)
+            self.vae.to(dtype=torch.float32)
+            self.text_encoder.to(dtype=torch.float32)
 
         # Create scheduler
         self.scheduler = DDIMScheduler.from_pretrained(
@@ -119,7 +119,7 @@ class SEINEDDIMInversionPipeline(nn.Module):
         logger.debug(f"self.frames shape: {self.frames.shape}")
 
         # Encode video frames
-        _frames = self.frames.to(torch.float16).to(self.device)
+        _frames = self.frames.to(torch.float32).to(self.device)
         self.latent_at_0 = self.vae.encode(_frames).latent_dist.sample().mul_(0.18215)
         logger.debug(f"self.latent_at_0 shape: {self.latent_at_0.shape}")
         self.latent_at_0 = rearrange(self.latent_at_0, "(b f) c h w -> b c f h w", b=1).contiguous()
@@ -171,8 +171,8 @@ class SEINEDDIMInversionPipeline(nn.Module):
 
                 # TODO: why in gaussian_diffusion.py, the input is [B, C, F, H, W]?
                 input = torch.concat([x_batch, mask_batch, masked_video_batch], dim=1)  # [b, c, f, h, w]
-                input = input.to(dtype=torch.float16)
-                cond_batch = cond_batch.to(dtype=torch.float16)
+                input = input.to(dtype=torch.float32)
+                cond_batch = cond_batch.to(dtype=torch.float32)
                 eps = self.unet(input, t, encoder_hidden_states=cond_batch).sample
                 pred_x0 = (x_batch - sigma_prev * eps) / mu_prev
                 latent_frames[b : b + batch_size] = mu * pred_x0 + sigma * eps
@@ -211,8 +211,8 @@ class SEINEDDIMInversionPipeline(nn.Module):
 
                 # TODO: why in gaussian_diffusion.py, the input is [B, C, F, H, W]?
                 input = torch.concat([x_batch, mask_batch, masked_video_batch], dim=1)  # [b, c, f, h, w]
-                input = input.to(dtype=torch.float16)
-                cond_batch = cond_batch.to(dtype=torch.float16)
+                input = input.to(dtype=torch.float32)
+                cond_batch = cond_batch.to(dtype=torch.float32)
                 eps = self.unet(input, t, encoder_hidden_states=cond_batch).sample
 
                 pred_x0 = (x_batch - sigma * eps) / mu
@@ -235,8 +235,8 @@ class SEINEDDIMInversionPipeline(nn.Module):
         video_input = padded_video_frames.to(self.device).unsqueeze(0)  # b,f,c,h,w # [1, 16, 3, 320, 512]
         mask = mask_generation_before("first1", video_input.shape, video_input.dtype, self.device)  # b,f,c,h,w
         masked_video = video_input * (mask == 0)
-        masked_video = masked_video.to(dtype=torch.float16)
-        mask = mask.to(dtype=torch.float16)
+        masked_video = masked_video.to(dtype=torch.float32)
+        mask = mask.to(dtype=torch.float32)
         logger.debug(f"video_input shape: {video_input.shape}")
         logger.debug(f"masked_video shape: {masked_video.shape}")
         logger.debug(f"mask shape: {mask.shape}")

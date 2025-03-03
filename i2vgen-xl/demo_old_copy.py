@@ -121,7 +121,7 @@ _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, con
 # Initialize the pipeline
 pipe = I2VGenXLPipeline.from_pretrained(
         "ali-vilab/i2vgen-xl",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         variant="fp16",
 )
 device="cuda:2"

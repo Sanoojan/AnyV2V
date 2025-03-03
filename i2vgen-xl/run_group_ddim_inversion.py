@@ -152,7 +152,7 @@ def main(template_config, configs_list,run_all=False,samples=50):
     # Initialize the pipeline
     pipe = I2VGenXLPipeline.from_pretrained(
         "ali-vilab/i2vgen-xl",
-        torch_dtype=torch.float16,
+        torch_dtype=torch.float32,
         variant="fp16",
     )
     pipe.to(device)

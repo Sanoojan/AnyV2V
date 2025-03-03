@@ -15,12 +15,12 @@ class InstantStyle():
 
         controlnet = ControlNetModel.from_pretrained(control_weight, 
                                                     use_safetensors=False, 
-                                                    torch_dtype=torch.float16).to(device)
+                                                    torch_dtype=torch.float32).to(device)
         # load SDXL pipeline
         sdxl_control_pipe = StableDiffusionXLControlNetPipeline.from_pretrained(
             weight,
             controlnet=controlnet,
-            torch_dtype=torch.float16,
+            torch_dtype=torch.float32,
             add_watermarker=False,
         )
         sdxl_control_pipe.enable_vae_tiling()

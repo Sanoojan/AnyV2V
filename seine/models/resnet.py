@@ -47,9 +47,9 @@ class Upsample3D(nn.Module):
         if self.use_conv_transpose:
             raise NotImplementedError
 
-        # Cast to float32 to as 'upsample_nearest2d_out_frame' op does not support bfloat16
+        # Cast to float32 to as 'upsample_nearest2d_out_frame' op does not support bfloat32
         dtype = hidden_states.dtype
-        if dtype == torch.bfloat16:
+        if dtype == torch.bfloat32:
             hidden_states = hidden_states.to(torch.float32)
 
         # upsample_nearest_nhwc fails with large batch sizes. see https://github.com/huggingface/diffusers/issues/984
@@ -63,8 +63,8 @@ class Upsample3D(nn.Module):
         else:
             hidden_states = F.interpolate(hidden_states, size=output_size, mode="nearest")
 
-        # If the input is bfloat16, we cast back to bfloat16
-        if dtype == torch.bfloat16:
+        # If the input is bfloat32, we cast back to bfloat32
+        if dtype == torch.bfloat32:
             hidden_states = hidden_states.to(dtype)
 
         if self.use_conv:
