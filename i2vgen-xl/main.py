@@ -19,6 +19,7 @@ from pipelines.unet_i2vgen_xl2 import I2VGenXLUNet2
 from run_group_ddim_inversion import ddim_inversion, ddim_sampling
 from pnp_utils import register_time, register_conv_injection
 from run_group_pnp_edit import init_pnp
+# set cuda visible device 2
 
 
 def setup_logging(debug):
@@ -37,7 +38,7 @@ def main(config_path):
 
     # Set up device and seed
     device = torch.device(config.device)
-    torch.set_grad_enabled(False)
+    # torch.set_grad_enabled(False)
     seed_everything(config.seed)
 
     # Load video frames
@@ -47,10 +48,14 @@ def main(config_path):
 
     # Initialize pipeline
     pipe = I2VGenXLPipeline.from_pretrained("ali-vilab/i2vgen-xl", torch_dtype=torch.float16, variant="fp16")
-    # custom_unet = I2VGenXLUNet2(**pipe.unet.config)
-    # custom_unet.load_state_dict(pipe.unet.state_dict())
-    # custom_unet = custom_unet.to(torch.float16)
-    # pipe.unet = custom_unet
+    
+    # Handling multiple edited frames
+    
+    custom_unet = I2VGenXLUNet2(**pipe.unet.config)
+    custom_unet.load_state_dict(pipe.unet.state_dict())
+    custom_unet = custom_unet.to(torch.float16)
+    pipe.unet = custom_unet
+    
     pipe.to(device)
     g = torch.Generator(device=device).manual_seed(config.seed)
 
@@ -60,8 +65,17 @@ def main(config_path):
 
     # Perform DDIM inversion
     inverse_conf_path = Path(config.inverse_config.output_dir)
-    if not inverse_conf_path.exists():
-        _ddim_latents = ddim_inversion(config.inverse_config, first_frame, frame_list, pipe, inverse_scheduler, g)
+    if not inverse_conf_path.exists() or config.inverse_config.force_inversion:
+        if config.null_optimization.null_optimization:
+            _ddim_latents = ddim_inversion(config.inverse_config, first_frame, frame_list, pipe, inverse_scheduler, g)  # [n_steps, 4,n_frames,,64,64]
+            null_inversion_embeds=pipe.null_optimization(_ddim_latents, 
+                                                         config.null_optimization,
+                                                         first_frame,
+                                                         ddim_inv_prompt=config.inverse_config.prompt)
+            # find uncond inversion latents (null_inversion_embedded)
+
+        else:
+            _ddim_latents = ddim_inversion(config.inverse_config, first_frame, frame_list, pipe, inverse_scheduler, g)
         logger.info(f"Saved inversion latents to: {config.inverse_config.output_dir}")
 
     # Perform DDIM reconstruction (if enabled)
@@ -118,6 +132,7 @@ def main(config_path):
         num_inference_steps=config.editing.n_steps,
         guidance_scale=config.editing.cfg,
         negative_prompt=config.editing.editing_negative_prompt,
+        null_inversion_embeds=None,
         target_fps=config.target_fps,
         latents=mixed_latents,
         generator=g,
@@ -127,16 +142,19 @@ def main(config_path):
         ddim_inv_prompt=config.editing.ddim_inv_prompt,
         ddim_inv_1st_frame=src_1st_frame,
     ).frames[0]
-
+    
+    
     # Save edited video
     output_path = os.path.join(config.output_dir, "edited_video.mp4")
     export_to_video(edited_video, output_path, fps=config.target_fps)
+    logger.info(f"Saved edited video to: {output_path}")
+    export_to_gif(edited_video, os.path.join(config.output_dir, "edited_video.gif"))
     logger.info(f"Saved edited video to: {output_path}")
 
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True, help="Path to config file")
+    parser.add_argument("--config", type=str, default="configs/Single_videos/yann_to_exersise_old_man.yaml", help="Path to config file")
     args = parser.parse_args()
     main(args.config)

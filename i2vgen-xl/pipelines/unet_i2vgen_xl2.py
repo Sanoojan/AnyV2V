@@ -527,6 +527,7 @@ class I2VGenXLUNet2(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
                 If `return_dict` is True, an [`~models.unet_3d_condition.UNet3DConditionOutput`] is returned, otherwise
                 a `tuple` is returned where the first element is the sample tensor.
         """
+        
         batch_size, channels, num_frames, height, width = sample.shape
 
         # By default samples have to be AT least a multiple of the overall upsampling factor.
@@ -570,7 +571,7 @@ class I2VGenXLUNet2(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
         # AND the image embeddings from the input image. For images, both VAE encodings
         # and the CLIP image embeddings are incorporated.
         # So the final `context_embeddings` becomes the query for cross-attention.
-        context_emb = sample.new_zeros(batch_size, 0, self.config.cross_attention_dim)
+        context_emb = sample.new_zeros(batch_size, 0, self.config.cross_attention_dim, requires_grad=True)
         context_emb = torch.cat([context_emb, encoder_hidden_states], dim=1)
 
         image_latents_context_embs = _collapse_frames_into_batch(image_latents[:, :, :1, :])
@@ -581,24 +582,24 @@ class I2VGenXLUNet2(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
             _batch_size, _height * _width, _channels
         )
         context_emb = torch.cat([context_emb, image_latents_context_embs], dim=1)
-    
+        # context_emb=context_emb.requires_grad_(True)
         
-        
-        image_emb = self.context_embedding(image_embeddings)  # 48,1,1024
-        image_emb = image_emb.view(-1, self.config.in_channels, self.config.cross_attention_dim) # 48,4,1024
-        to_repeat= num_frames-image_emb.shape[0] // 3
-        # repeating last 3 from image_emb
-        image_emb = torch.cat([image_emb, image_emb[-3:].repeat(to_repeat, 1, 1)], dim=0)
-        
-        # context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
-        context_emb = context_emb.repeat_interleave(repeats=num_frames, dim=0) # 48,141,1024
-        context_emb = torch.cat([context_emb, image_emb], dim=1) # 48,145,1024 # added here
-
-
+        # Edited by me
         # image_emb = self.context_embedding(image_embeddings)  # 48,1,1024
         # image_emb = image_emb.view(-1, self.config.in_channels, self.config.cross_attention_dim) # 48,4,1024
-        # context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
+        # to_repeat= num_frames-image_emb.shape[0] // 3
+        # # repeating last 3 from image_emb
+        # image_emb = torch.cat([image_emb, image_emb[-3:].repeat(to_repeat, 1, 1)], dim=0)
+        
+        # # context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
         # context_emb = context_emb.repeat_interleave(repeats=num_frames, dim=0) # 48,141,1024
+        # context_emb = torch.cat([context_emb, image_emb], dim=1) # 48,145,1024 # added here
+
+        #previous code
+        image_emb = self.context_embedding(image_embeddings)  # 48,1,1024
+        image_emb = image_emb.view(-1, self.config.in_channels, self.config.cross_attention_dim) # 48,4,1024
+        context_emb = torch.cat([context_emb, image_emb], dim=1) # 3,145,1024
+        context_emb = context_emb.repeat_interleave(repeats=num_frames, dim=0) # 48,141,1024
        
 
 

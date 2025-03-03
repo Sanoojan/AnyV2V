@@ -1,6 +1,6 @@
 # General settings
 seed: 8888
-device: "cuda:2"  # Change to the GPU you want to use
+device: "cuda:4"  # Change to the GPU you want to use
 debug: False  # For logging DEBUG level messages otherwise INFO
 
 # Directories
@@ -20,19 +20,30 @@ edited_frames_path: "${data_dir}/demo/${video_name}/edited_first_frame/Yann"
 ddim_latents_path: "${data_dir}/inversions_ind/${Experiment_name}/${model_name}/${video_name}/ddim_latents"
 
 # Video processing
-n_frames: 16
+n_frames: 4
 target_fps: 8
 
 # DDIM inversion
 inverse_config:
+  force_inversion: True
   cfg: 1.0
-  n_steps: 500
-  prompt: "A very sad and depressed guy"
+  n_steps: 5   # change this to 500
+  prompt: "A human"
   negative_prompt: ""
   output_dir: "${ddim_latents_path}"
   image_size: "${image_size}"
   n_frames: "${n_frames}"
   target_fps: "${target_fps}" 
+
+#null_optimization
+null_optimization:
+  null_optimization: True
+  num_inner_steps: 1
+  epsilon: 9.0
+  n_steps: 5
+  guidance_scale: 9.0
+  image_size: "${image_size}"
+  n_frames: "${n_frames}"
 
 # DDIM reconstruction
 recon_config:
@@ -41,6 +52,10 @@ recon_config:
   n_steps: 50
   ddim_init_latents_t_idx: 3
   negative_prompt: "Distorted, discontinuous, Ugly, blurry, low resolution, motionless, static, disfigured, disconnected limbs, Ugly faces, incomplete arms"
+  prompt: "a human"
+  image_size: "${image_size}"
+  n_frames: "${n_frames}"
+  target_fps: "${target_fps}"
 
 # Editing settings
 editing:
