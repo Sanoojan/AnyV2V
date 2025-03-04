@@ -1221,6 +1221,11 @@ class I2VGenXLPipeline(DiffusionPipeline):
                 # Pnp
                 register_time(self, t.item())
 
+                prompt_image_latents_all=torch.randn_like(image_latents_all)
+                prompt_image_embeddings_all=torch.randn_like(image_embeddings_all)
+                prompt_text_embeds_all=torch.randn_like(prompt_embeds_all)
+                prompt_latent_model_input=torch.randn_like(latent_model_input)
+
                 # predict the noise residual
                 noise_pred = self.unet(
                     latent_model_input,

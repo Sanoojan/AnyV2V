@@ -129,9 +129,14 @@ def main(config_path):
     ).frames[0]
 
     # Save edited video
+    if not os.path.exists(config.output_dir):
+        os.makedirs(config.output_dir)
+    
     output_path = os.path.join(config.output_dir, "edited_video.mp4")
     export_to_video(edited_video, output_path, fps=config.target_fps)
     logger.info(f"Saved edited video to: {output_path}")
+    export_to_gif(edited_video, os.path.join(config.output_dir, "edited_video.gif"))
+    logger.info(f"Saved edited video as gif to: {config.output_dir}")
 
 
 if __name__ == "__main__":
