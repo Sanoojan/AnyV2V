@@ -38,7 +38,7 @@ def main(config_path):
 
     # Set up device and seed
     device = torch.device(config.device)
-    # torch.set_grad_enabled(False)
+    torch.set_grad_enabled(False)
     seed_everything(config.seed)
 
     # Load video frames
@@ -68,10 +68,13 @@ def main(config_path):
     if not inverse_conf_path.exists() or config.inverse_config.force_inversion:
         if config.null_optimization.null_optimization:
             _ddim_latents = ddim_inversion(config.inverse_config, first_frame, frame_list, pipe, inverse_scheduler, g)  # [n_steps, 4,n_frames,,64,64]
-            null_inversion_embeds=pipe.null_optimization(_ddim_latents, 
+            _null_latents=pipe.null_optimization(_ddim_latents, 
                                                          config.null_optimization,
                                                          first_frame,
                                                          ddim_inv_prompt=config.inverse_config.prompt)
+            
+            
+            
             # find uncond inversion latents (null_inversion_embedded)
 
         else:
@@ -132,7 +135,8 @@ def main(config_path):
         num_inference_steps=config.editing.n_steps,
         guidance_scale=config.editing.cfg,
         negative_prompt=config.editing.editing_negative_prompt,
-        null_inversion_embeds=None,
+        null_latents_path=config.null_optimization.output_dir,
+        null_optimization=config.null_optimization.null_optimization,
         target_fps=config.target_fps,
         latents=mixed_latents,
         generator=g,
@@ -144,12 +148,20 @@ def main(config_path):
     ).frames[0]
     
     
+    if not os.path.exists(config.output_dir):
+        os.makedirs(config.output_dir, exist_ok=True)
+    
     # Save edited video
     output_path = os.path.join(config.output_dir, "edited_video.mp4")
     export_to_video(edited_video, output_path, fps=config.target_fps)
     logger.info(f"Saved edited video to: {output_path}")
     export_to_gif(edited_video, os.path.join(config.output_dir, "edited_video.gif"))
     logger.info(f"Saved edited video to: {output_path}")
+    edited_video_file_name = "video"
+    for i, frame in enumerate(edited_video):
+        
+      frame.save(os.path.join(config.output_dir, f"{edited_video_file_name}_{i:05d}.png"))
+      logger.info(f"Saved frames to: {os.path.join(config.output_dir, f'{edited_video_file_name}_{i:05d}.png')}")
 
 
 if __name__ == "__main__":

@@ -1,13 +1,13 @@
 # General settings
 seed: 8888
-device: "cuda:4"  # Change to the GPU you want to use
-debug: False  # For logging DEBUG level messages otherwise INFO
+device: "cuda:5"  # Change to the GPU you want to use
+debug: True  # For logging DEBUG level messages otherwise INFO
 
 # Directories
 data_dir: "/home/sanoojan/Video_diffusion/AnyV2V"
 model_name: "i2vgen-xl"
 task_name: "Prompt-Based-Editing"
-Experiment_name: "Debug"
+Experiment_name: "Debug_null2"
 video_name: "An Old Man Doing Exercises For The Body And Mind"
 output_dir: "${data_dir}/Results/${Experiment_name}/${task_name}/${model_name}/${video_name}"
 
@@ -18,16 +18,17 @@ video_frames_path: "${video_dir}/${video_name}"
 edited_first_frame_path: "${data_dir}/demo/${video_name}/edited_first_frame/yann_lecunn.png"
 edited_frames_path: "${data_dir}/demo/${video_name}/edited_first_frame/Yann"
 ddim_latents_path: "${data_dir}/inversions_ind/${Experiment_name}/${model_name}/${video_name}/ddim_latents"
+null_latents_path: "${data_dir}/inversions_ind/${Experiment_name}/${model_name}/${video_name}/null_latents"
 
 # Video processing
-n_frames: 4
+n_frames: 8
 target_fps: 8
 
 # DDIM inversion
 inverse_config:
   force_inversion: True
   cfg: 1.0
-  n_steps: 5   # change this to 500
+  n_steps: 50   # change this to 500
   prompt: "A human"
   negative_prompt: ""
   output_dir: "${ddim_latents_path}"
@@ -38,12 +39,13 @@ inverse_config:
 #null_optimization
 null_optimization:
   null_optimization: True
-  num_inner_steps: 1
+  num_inner_steps: 10
   epsilon: 9.0
-  n_steps: 5
+  n_steps: 50 # change this to 500
   guidance_scale: 9.0
   image_size: "${image_size}"
   n_frames: "${n_frames}"
+  output_dir: "${null_latents_path}"
 
 # DDIM reconstruction
 recon_config:

@@ -29,6 +29,13 @@ def load_ddim_latents_at_t(t, ddim_latents_path):
     logger.debug(f"Loaded ddim_latents_at_t from {ddim_latents_at_t_path}")
     return ddim_latents_at_t
 
+def load_null_latents_at_t(t, null_latents_path):
+    null_latents_at_t_path = os.path.join(null_latents_path, f"null_latents_{t}.pt")
+    assert os.path.exists(null_latents_at_t_path), f"Missing null latents at t {t} path {null_latents_at_t_path}"
+    null_latents_at_t = torch.load(null_latents_at_t_path)
+    logger.debug(f"Loaded null_latents_at_t from {null_latents_at_t_path}")
+    return null_latents_at_t
+
 
 def load_ddim_latents_at_T(ddim_latents_path):
     noisest = max(

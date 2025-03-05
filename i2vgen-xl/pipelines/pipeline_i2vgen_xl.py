@@ -43,7 +43,7 @@ from diffusers import DiffusionPipeline
 # [Modified]
 # Project import
 from pnp_utils import register_time
-from utils import load_ddim_latents_at_t
+from utils import load_ddim_latents_at_t,load_null_latents_at_t
 from einops import rearrange
 from tqdm import tqdm
 from torch.optim.adam import Adam
@@ -953,11 +953,7 @@ class I2VGenXLPipeline(DiffusionPipeline):
     def get_noise_pred_single(self, latents, t, context,image_latents=None,image_embeddings=None):
         latents = self.scheduler.scale_model_input(latents, t)
    
-                
-        latents = latents
-        image_latents=image_latents[0,:,:,:,:].unsqueeze(0)
-        image_embeddings=image_embeddings[0,:,:].unsqueeze(0)
-        
+  
         
         noise_pred = self.unet(
             latents,
@@ -974,6 +970,10 @@ class I2VGenXLPipeline(DiffusionPipeline):
     def get_noise_pred(self, latents, t,image_latents=None,image_embeddings=None,GUIDANCE_SCALE=9.0, is_forward=True, context=None):
         latents=latents
         latents_input = torch.cat([latents] * 2)
+        image_embeddings= torch.cat([image_embeddings] * 2)
+        context= torch.cat([context] * 2)
+        
+        
         if context is None:
             context = self.context
         guidance_scale = 1 if is_forward else GUIDANCE_SCALE
@@ -1016,6 +1016,8 @@ class I2VGenXLPipeline(DiffusionPipeline):
         width=config.image_size[0]
         num_frames=config.n_frames
         self.scheduler.final_alpha_cumprod = self.scheduler.alphas_cumprod[0]
+        output_dir=config.output_dir
+        torch.set_grad_enabled(True)
         
         self.context= self.encode_prompt(   # check this whether to add ddim_inv or ddim
             ddim_inv_prompt,
@@ -1045,9 +1047,20 @@ class I2VGenXLPipeline(DiffusionPipeline):
         noise_image_embeddings = self._encode_image(noise_image, device, num_videos_per_prompt)
         # 3.2.2 Image latents.
         resized_image = _center_crop_wide(image, (width, height))
+        resized_noise_image=_center_crop_wide(noise_image, (width, height))
+        
+        noise_image=self.image_processor.preprocess(resized_noise_image).to(device=device, dtype=image_embeddings.dtype)
+        
         image = self.image_processor.preprocess(resized_image).to(device=device, dtype=image_embeddings.dtype)
         image_latents = self.prepare_image_latents(
             image,
+            device=device,
+            num_frames=num_frames,
+            num_videos_per_prompt=num_videos_per_prompt,
+        )
+        
+        noise_image_latents=self.prepare_image_latents(
+            noise_image,
             device=device,
             num_frames=num_frames,
             num_videos_per_prompt=num_videos_per_prompt,
@@ -1071,25 +1084,44 @@ class I2VGenXLPipeline(DiffusionPipeline):
 
         prompt_embeds_all = torch.cat([cond_embeddings, uncond_embeddings, cond_embeddings])
         
-        uncond_embeddings_list = []
+        noise_latents_list = []
         latent_cur = latents[-1].unsqueeze(0)
         noise_latent_curr = latents[-1].unsqueeze(0).clone().detach()
         bar = tqdm(total=num_inner_steps * NUM_DDIM_STEPS)
+        
+        noise_image_latents=noise_image_latents[0,:,:,:,:].unsqueeze(0)
+        image_latents=image_latents[0,:,:,:,:].unsqueeze(0)
+        image_embeddings=image_embeddings[0,:,:].unsqueeze(0)
+        
+        # self.unet=self.unet.to(torch.float32)
+        
         for i in range(NUM_DDIM_STEPS):
-            if i == 0:
-                continue
-            noise_image_embeddings=noise_image_embeddings.clone().detach()
+            
+            
+            noise_image_latents=noise_image_latents.clone().detach()
+            noise_image_latents=noise_image_latents.requires_grad_(True)
+            
+            cond_embeddings=cond_embeddings.clone().detach()
+            cond_embeddings=cond_embeddings.requires_grad_(True)
+            
+            latent_cur=latent_cur.clone().detach()
+            latent_cur=latent_cur.requires_grad_(True)
+            
+            image_embeddings=image_embeddings.clone().detach()
+            image_embeddings=image_embeddings.requires_grad_(True)
+            
+            uncond_embeddings=uncond_embeddings.clone().detach()
+            uncond_embeddings=uncond_embeddings.requires_grad_(True)
+            
             image_latents=image_latents.clone().detach()
-            # image_latents.requires_grad=True
-            noise_image_embeddings.requires_grad = True
-            uncond_embeddings = uncond_embeddings.clone().detach().requires_grad_(True)
-            uncond_embeddings.requires_grad = True
-            # image_embeddings.requires_grad=True
-            # image_latents.requires_grad=True
-            latent_cur=latents[-i-1].unsqueeze(0)
-            latent_cur.requires_grad=True
-            noise_latent_curr.requires_grad=True
-            optimizer = Adam([noise_latent_curr], lr=1e-5 * (1. - i / 100.))
+            image_latents=image_latents.requires_grad_(True)
+            
+            
+            
+            
+            
+            
+            optimizer = Adam([noise_image_latents], lr=1e-2 * (1. - i / 100.),foreach=True)
             latent_prev = latents[len(latents) - i - 2]
             t = self.scheduler.timesteps[i]
             with torch.no_grad():
@@ -1097,19 +1129,29 @@ class I2VGenXLPipeline(DiffusionPipeline):
             for j in range(num_inner_steps):
                 
                     
-                noise_pred_uncond = self.get_noise_pred_single(noise_latent_curr, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=image_latents)
+                noise_pred_uncond = self.get_noise_pred_single(latent_cur, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=noise_image_latents)
                 # GUIDANCE_SCALE = torch.tensor(GUIDANCE_SCALE, dtype=torch.float32, device=noise_pred_uncond.device)
                 noise_pred = noise_pred_uncond + GUIDANCE_SCALE * (noise_pred_cond - noise_pred_uncond)
                 latents_prev_rec = self.prev_step(noise_pred, t, noise_latent_curr)
                 latent_prev=latent_prev.unsqueeze(0) ## check this
-                loss = nnf.mse_loss(latents_prev_rec, latent_prev)
-                print(loss)
+                loss = nnf.mse_loss(latents_prev_rec.float(), latent_prev.float())
+                logger.debug(f"loss: {loss.item()}")
                 optimizer.zero_grad()
                 # torch.autograd.set_detect_anomaly(True)
                 # loss.requires_grad_(True)
                 # grads = torch.autograd.grad(loss, uncond_embeddings, retain_graph=True, allow_unused=True)
-                # loss.backward()
-                # optimizer.step()
+                
+                loss.backward()
+                # torch.nn.utils.clip_grad_norm_(noise_image_latents, max_norm=0.1)
+                
+                noise_image_latents = noise_image_latents.to(torch.float32)
+                cond_embeddings = cond_embeddings.to(torch.float32)
+                latent_cur = latent_cur.to(torch.float32)
+                image_embeddings = image_embeddings.to(torch.float32)
+                uncond_embeddings = uncond_embeddings.to(torch.float32)
+                image_latents = image_latents.to(torch.float32)
+                
+                optimizer.step()
                 # if torch.count_nonzero(noise_image_embeddings.grad) != 0:
                 #     optimizer.step()  
                 # else:
@@ -1120,15 +1162,31 @@ class I2VGenXLPipeline(DiffusionPipeline):
                     break
             for j in range(j + 1, num_inner_steps):
                 bar.update()
-            uncond_embeddings_list.append(uncond_embeddings[:1].detach())
+            noise_latents_list.append(noise_image_latents[:1].detach())  #check this
             
+            os.makedirs(output_dir, exist_ok=True)
+            torch.save(
+                noise_image_latents.detach().clone(),
+                os.path.join(output_dir, f"null_latents_{t}.pt"),
+            )
+            logger.debug(f"saved noisy latents at t={t} to {output_dir}")
             # #check this
-            # with torch.no_grad():
-            #     context = torch.cat([uncond_embeddings, cond_embeddings])
-            #     latent_cur = self.get_noise_pred(latent_cur, t, image_latents=image_latents,image_embeddings=image_embeddings, GUIDANCE_SCALE=GUIDANCE_SCALE, is_forward=False, context=context)
-            del optimizer
+            with torch.no_grad():
+                noise_image_latents = noise_image_latents.to(torch.float16)
+                cond_embeddings = cond_embeddings.to(torch.float16)
+                latent_cur = latent_cur.to(torch.float16)
+                image_embeddings = image_embeddings.to(torch.float16)
+                uncond_embeddings = uncond_embeddings.to(torch.float16)
+                image_latents = image_latents.to(torch.float16)
+                
+                Latents_all = torch.cat([noise_image_latents, image_latents])
+                
+                latent_cur = self.get_noise_pred(latent_cur, t, image_latents=Latents_all,image_embeddings=image_embeddings, GUIDANCE_SCALE=GUIDANCE_SCALE, is_forward=False, context=cond_embeddings)
+        
         bar.close()
-        return uncond_embeddings_list
+        
+        torch.set_grad_enabled(False)
+        return noise_latents_list
         
         
 
@@ -1153,7 +1211,8 @@ class I2VGenXLPipeline(DiffusionPipeline):
             latents: Optional[torch.FloatTensor] = None,
             prompt_embeds: Optional[torch.FloatTensor] = None,
             negative_prompt_embeds: Optional[torch.FloatTensor] = None,
-            null_inversion_embeds: Optional[torch.FloatTensor] = None,
+            null_optimization: bool = False,
+            null_latents_path: Optional[str] = None,
             output_type: Optional[str] = "pil",
             return_dict: bool = True,
             cross_attention_kwargs: Optional[Dict[str, Any]] = None,
@@ -1289,8 +1348,8 @@ class I2VGenXLPipeline(DiffusionPipeline):
         # [ddim_inversion_prompt, editing_negative_prompt, editing_prompt]
         
         
-        if null_inversion_embeds is not None:
-            negative_prompt_embeds = null_inversion_embeds
+        # if null_inversion_embeds is not None:
+        #     negative_prompt_embeds = null_inversion_embeds
         
         
 
@@ -1386,6 +1445,8 @@ class I2VGenXLPipeline(DiffusionPipeline):
         else:
             image_embeddings_all = torch.cat([ddim_inv_1st_frame_embeddings, image_embeddings])
             image_latents_all = torch.cat([ddim_inv_1st_frame_latents, image_latents])
+            
+        
         
         # 3.3 Prepare additional conditions for the UNet.
         if self.do_classifier_free_guidance:
@@ -1426,10 +1487,24 @@ class I2VGenXLPipeline(DiffusionPipeline):
                 # [Modified]
                 # Order: ddim_inversion_prompt, editing_negative_prompt, editing_prompt
                 ddim_inv_latents_at_t = load_ddim_latents_at_t(t, ddim_inv_latents_path).to(self.device)
+                
+                if null_optimization:
+                    null_latent_at_t = load_null_latents_at_t(t, null_latents_path).to(self.device)
+                    null_latent_at_t = null_latent_at_t.to(latents.dtype)
+                
                 if self.do_classifier_free_guidance:
                     latent_model_input = torch.cat([ddim_inv_latents_at_t, latents, latents])
                 else:
                     latent_model_input = torch.cat([ddim_inv_latents_at_t, latents])
+
+                if null_optimization:
+                    image_latents_all = torch.cat([null_latent_at_t ,image_latents_all[1:]])
+                    
+                    # latent_model_input = torch.cat([latent_model_input, ddim_inv_latents_at_t])
+                    # prompt_embeds_all=torch.cat([prompt_embeds_all,prompt_embeds_all[-1].unsqueeze(0)])
+                    # fps_tensor = torch.cat([fps_tensor, torch.tensor([8]).to(device)])
+                    # image_embeddings_all = torch.cat([image_embeddings_all, image_embeddings_all[-1].unsqueeze(0)])
+                
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # [Modified]
@@ -1452,9 +1527,16 @@ class I2VGenXLPipeline(DiffusionPipeline):
                 # [Modified]
                 # Order: ddim_inversion_prompt, editing_negative_prompt, editing_prompt
                 if self.do_classifier_free_guidance:
-                    _noise_pred_ddim_inv, noise_pred_negative, noise_pred_editing  = noise_pred.chunk(3)
-                    logger.debug(f"doing classifier free guidance with guidance_scale: {guidance_scale}")
-                    noise_pred = noise_pred_negative + guidance_scale * (noise_pred_editing - noise_pred_negative)
+                    
+                    if null_optimization:
+                        noise_pred_null, noise_pred_negative, noise_pred_editing = noise_pred.chunk(4)
+                        logger.debug(f"doing classifier free guidance and null latent enhancement with guidance_scale: {guidance_scale}")
+                        noise_pred = noise_pred_null + guidance_scale * (noise_pred_editing - noise_pred_null)
+                    
+                    else:
+                        _noise_pred_ddim_inv, noise_pred_negative, noise_pred_editing  = noise_pred.chunk(3)
+                        logger.debug(f"doing classifier free guidance with guidance_scale: {guidance_scale}")
+                        noise_pred = noise_pred_negative + guidance_scale * (noise_pred_editing - noise_pred_negative)
                 else:
                     _noise_pred_ddim_inv, noise_pred_editing = noise_pred.chunk(2)
                     noise_pred = noise_pred_editing
