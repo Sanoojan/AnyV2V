@@ -971,6 +971,7 @@ class I2VGenXLPipeline(DiffusionPipeline):
         latents=latents
         latents_input = torch.cat([latents] * 2)
         image_embeddings= torch.cat([image_embeddings] * 2)
+        # image_latents= torch.cat([image_latents] * 2)
         context= torch.cat([context] * 2)
         
         
@@ -997,11 +998,205 @@ class I2VGenXLPipeline(DiffusionPipeline):
             latents = self.prev_step(noise_pred, t, latents)
         return latents
     
+    # def null_optimization(self, 
+    #                       latents, 
+    #                       config,
+    #                       image,
+    #                       ddim_inv_prompt: Union[str, List[str]] = None):
+    #     num_inner_steps = config.num_inner_steps   
+    #     epsilon = config.epsilon
+    #     NUM_DDIM_STEPS = config.n_steps
+    #     GUIDANCE_SCALE = config.guidance_scale
+    #     self.unet.train()
+    #     text_encoder_lora_scale = None
+    #     device = self._execution_device
+    #     num_videos_per_prompt=1
+    #     clip_skip=1
+    #     self._guidance_scale = config.guidance_scale
+    #     height=config.image_size[1]
+    #     width=config.image_size[0]
+    #     num_frames=config.n_frames
+    #     self.scheduler.final_alpha_cumprod = self.scheduler.alphas_cumprod[0]
+    #     output_dir=config.output_dir
+    #     torch.set_grad_enabled(True)
+        
+    #     self.context= self.encode_prompt(   # check this whether to add ddim_inv or ddim
+    #         ddim_inv_prompt,
+    #         device,
+    #         num_videos_per_prompt,
+    #         negative_prompt="",
+    #         prompt_embeds=None,
+    #         negative_prompt_embeds=None,
+    #         lora_scale=text_encoder_lora_scale,
+    #         clip_skip=clip_skip,
+    #     )
+        
+        
+    #     cropped_image = _center_crop_wide(image, (width, width))
+    #     cropped_image = _resize_bilinear(
+    #         cropped_image, (self.feature_extractor.crop_size["width"], self.feature_extractor.crop_size["height"])
+    #     )
+    #     noise_rgb = np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)
+        
+    #     noise_image=Image.fromarray(noise_rgb,mode='RGB')
+    #     # noise_rgb = _resize_bilinear(
+    #     #     noise_rgb, (self.feature_extractor.crop_size["width"], self.feature_extractor.crop_size["height"])
+    #     # )
+        
+    #     image_embeddings = self._encode_image(cropped_image, device, num_videos_per_prompt)
+
+    #     noise_image_embeddings = self._encode_image(noise_image, device, num_videos_per_prompt)
+    #     # 3.2.2 Image latents.
+    #     resized_image = _center_crop_wide(image, (width, height))
+    #     resized_noise_image=_center_crop_wide(noise_image, (width, height))
+        
+    #     noise_image=self.image_processor.preprocess(resized_noise_image).to(device=device, dtype=image_embeddings.dtype)
+        
+    #     image = self.image_processor.preprocess(resized_image).to(device=device, dtype=image_embeddings.dtype)
+    #     image_latents = self.prepare_image_latents(
+    #         image,
+    #         device=device,
+    #         num_frames=num_frames,
+    #         num_videos_per_prompt=num_videos_per_prompt,
+    #     )
+        
+    #     noise_image_latents=self.prepare_image_latents(
+    #         noise_image,
+    #         device=device,
+    #         num_frames=num_frames,
+    #         num_videos_per_prompt=num_videos_per_prompt,
+    #     )
+        
+    #     # prompt_embeds, negative_prompt_embeds = self.encode_prompt(
+    #     #     ddim_inv_prompt,
+    #     #     device,
+    #     #     num_videos_per_prompt,
+    #     #     negative_prompt,
+    #     #     prompt_embeds=prompt_embeds,
+    #     #     negative_prompt_embeds=negative_prompt_embeds,
+    #     #     lora_scale=text_encoder_lora_scale,
+    #     #     clip_skip=clip_skip,
+    #     # )
+        
+        
+        
+    #     cond_embeddings,uncond_embeddings = self.context  # check order
+   
+
+    #     prompt_embeds_all = torch.cat([cond_embeddings, uncond_embeddings, cond_embeddings])
+        
+    #     noise_latents_list = []
+    #     latent_cur = latents[-1].unsqueeze(0)
+    #     noise_latent_curr = latents[-1].unsqueeze(0).clone().detach()
+    #     bar = tqdm(total=num_inner_steps * NUM_DDIM_STEPS)
+        
+    #     noise_image_latents=noise_image_latents[0,:,:,:,:].unsqueeze(0)
+    #     image_latents=image_latents[0,:,:,:,:].unsqueeze(0)
+    #     image_embeddings=image_embeddings[0,:,:].unsqueeze(0)
+        
+    #     # self.unet=self.unet.to(torch.float32)
+        
+    #     for i in range(NUM_DDIM_STEPS):
+            
+            
+    #         noise_image_latents=noise_image_latents.clone().detach()
+    #         noise_image_latents=noise_image_latents.requires_grad_(True)
+            
+    #         cond_embeddings=cond_embeddings.clone().detach()
+    #         cond_embeddings=cond_embeddings.requires_grad_(True)
+            
+    #         latent_cur=latent_cur.clone().detach()
+    #         latent_cur=latent_cur.requires_grad_(True)
+            
+    #         image_embeddings=image_embeddings.clone().detach()
+    #         image_embeddings=image_embeddings.requires_grad_(True)
+            
+    #         uncond_embeddings=uncond_embeddings.clone().detach()
+    #         uncond_embeddings=uncond_embeddings.requires_grad_(True)
+            
+    #         image_latents=image_latents.clone().detach()
+    #         image_latents=image_latents.requires_grad_(True)
+            
+            
+            
+            
+            
+            
+    #         optimizer = Adam([uncond_embeddings], lr=1e-2 * (1. - i / 100.),foreach=True)
+    #         latent_prev = latents[len(latents) - i - 2]
+    #         t = self.scheduler.timesteps[i]
+    #         with torch.no_grad():
+    #             noise_pred_cond = self.get_noise_pred_single(latent_cur, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=image_latents)
+    #         for j in range(num_inner_steps):
+                
+                    
+    #             noise_pred_uncond = self.get_noise_pred_single(latent_cur, t, uncond_embeddings,image_embeddings=image_embeddings,image_latents=image_latents)
+    #             # GUIDANCE_SCALE = torch.tensor(GUIDANCE_SCALE, dtype=torch.float32, device=noise_pred_uncond.device)
+    #             noise_pred = noise_pred_uncond + GUIDANCE_SCALE * (noise_pred_cond - noise_pred_uncond)
+    #             latents_prev_rec = self.prev_step(noise_pred, t, noise_latent_curr)
+    #             latent_prev=latent_prev.unsqueeze(0) ## check this
+    #             loss = nnf.mse_loss(latents_prev_rec.float(), latent_prev.float())
+    #             logger.debug(f"loss: {loss.item()}")
+    #             optimizer.zero_grad()
+    #             # torch.autograd.set_detect_anomaly(True)
+    #             # loss.requires_grad_(True)
+    #             # grads = torch.autograd.grad(loss, uncond_embeddings, retain_graph=True, allow_unused=True)
+                
+    #             loss.backward()
+    #             # torch.nn.utils.clip_grad_norm_(noise_image_latents, max_norm=0.1)
+                
+    #             noise_image_latents = noise_image_latents.to(torch.float32)
+    #             cond_embeddings = cond_embeddings.to(torch.float32)
+    #             latent_cur = latent_cur.to(torch.float32)
+    #             image_embeddings = image_embeddings.to(torch.float32)
+    #             uncond_embeddings = uncond_embeddings.to(torch.float32)
+    #             image_latents = image_latents.to(torch.float32)
+                
+    #             optimizer.step()
+    #             # if torch.count_nonzero(noise_image_embeddings.grad) != 0:
+    #             #     optimizer.step()  
+    #             # else:
+    #             #     optimizer.zero_grad() 
+    #             loss_item = loss.item()
+    #             bar.update()
+    #             if loss_item < epsilon + i * 2e-5:
+    #                 break
+    #         for j in range(j + 1, num_inner_steps):
+    #             bar.update()
+    #         noise_latents_list.append(noise_image_latents[:1].detach())  #check this
+            
+    #         os.makedirs(output_dir, exist_ok=True)
+    #         torch.save(
+    #             uncond_embeddings.detach().clone(),
+    #             os.path.join(output_dir, f"null_latents_{t}.pt"),
+    #         )
+    #         logger.debug(f"saved noisy latents at t={t} to {output_dir}")
+    #         # #check this
+    #         with torch.no_grad():
+    #             noise_image_latents = noise_image_latents.to(torch.float16)
+    #             cond_embeddings = cond_embeddings.to(torch.float16)
+    #             latent_cur = latent_cur.to(torch.float16)
+    #             image_embeddings = image_embeddings.to(torch.float16)
+    #             uncond_embeddings = uncond_embeddings.to(torch.float16)
+    #             image_latents = image_latents.to(torch.float16)
+                
+    #             # Latents_all = torch.cat([noise_image_latents, image_latents])
+                
+    #             context = torch.cat([uncond_embeddings,cond_embeddings ])
+                
+    #             latent_cur = self.get_noise_pred(latent_cur, t, image_latents=image_latents,image_embeddings=image_embeddings, GUIDANCE_SCALE=GUIDANCE_SCALE, is_forward=False, context=context)
+        
+    #     bar.close()
+        
+    #     torch.set_grad_enabled(False)
+    #     return noise_latents_list
+    
     def null_optimization(self, 
                           latents, 
                           config,
                           image,
-                          ddim_inv_prompt: Union[str, List[str]] = None):
+                          ddim_inv_prompt: Union[str, List[str]] = None,
+                          edited_1st_frame=None):
         num_inner_steps = config.num_inner_steps   
         epsilon = config.epsilon
         NUM_DDIM_STEPS = config.n_steps
@@ -1035,22 +1230,16 @@ class I2VGenXLPipeline(DiffusionPipeline):
         cropped_image = _resize_bilinear(
             cropped_image, (self.feature_extractor.crop_size["width"], self.feature_extractor.crop_size["height"])
         )
-        noise_rgb = np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)
         
-        noise_image=Image.fromarray(noise_rgb,mode='RGB')
         # noise_rgb = _resize_bilinear(
         #     noise_rgb, (self.feature_extractor.crop_size["width"], self.feature_extractor.crop_size["height"])
         # )
         
         image_embeddings = self._encode_image(cropped_image, device, num_videos_per_prompt)
 
-        noise_image_embeddings = self._encode_image(noise_image, device, num_videos_per_prompt)
+        
         # 3.2.2 Image latents.
         resized_image = _center_crop_wide(image, (width, height))
-        resized_noise_image=_center_crop_wide(noise_image, (width, height))
-        
-        noise_image=self.image_processor.preprocess(resized_noise_image).to(device=device, dtype=image_embeddings.dtype)
-        
         image = self.image_processor.preprocess(resized_image).to(device=device, dtype=image_embeddings.dtype)
         image_latents = self.prepare_image_latents(
             image,
@@ -1059,24 +1248,27 @@ class I2VGenXLPipeline(DiffusionPipeline):
             num_videos_per_prompt=num_videos_per_prompt,
         )
         
-        noise_image_latents=self.prepare_image_latents(
+       
+        # noise_rgb = np.random.randint(0, 256, (224, 224, 3), dtype=np.uint8)
+        
+        noise_image=edited_1st_frame
+        noise_cropped_image = _center_crop_wide(noise_image, (width, width))
+        noise_cropped_image = _resize_bilinear(
+            noise_cropped_image, (self.feature_extractor.crop_size["width"], self.feature_extractor.crop_size["height"])
+        )
+        noise_image_embeddings = self._encode_image(noise_cropped_image, device, num_videos_per_prompt)
+
+        # 3.2.2 Image latents.
+        noise_resized_image = _center_crop_wide(noise_image, (width, height))
+        noise_image = self.image_processor.preprocess(noise_resized_image).to(device=device, dtype=image_embeddings.dtype)
+        noise_image_latents = self.prepare_image_latents(
             noise_image,
             device=device,
             num_frames=num_frames,
             num_videos_per_prompt=num_videos_per_prompt,
         )
         
-        # prompt_embeds, negative_prompt_embeds = self.encode_prompt(
-        #     ddim_inv_prompt,
-        #     device,
-        #     num_videos_per_prompt,
-        #     negative_prompt,
-        #     prompt_embeds=prompt_embeds,
-        #     negative_prompt_embeds=negative_prompt_embeds,
-        #     lora_scale=text_encoder_lora_scale,
-        #     clip_skip=clip_skip,
-        # )
-        
+       
         
         
         cond_embeddings,uncond_embeddings = self.context  # check order
@@ -1090,6 +1282,7 @@ class I2VGenXLPipeline(DiffusionPipeline):
         bar = tqdm(total=num_inner_steps * NUM_DDIM_STEPS)
         
         noise_image_latents=noise_image_latents[0,:,:,:,:].unsqueeze(0)
+        # noise_image_latents=image_latents[0,:,:,:,:].unsqueeze(0)
         image_latents=image_latents[0,:,:,:,:].unsqueeze(0)
         image_embeddings=image_embeddings[0,:,:].unsqueeze(0)
         
@@ -1128,6 +1321,12 @@ class I2VGenXLPipeline(DiffusionPipeline):
                 noise_pred_cond = self.get_noise_pred_single(latent_cur, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=image_latents)
             for j in range(num_inner_steps):
                 
+                noise_image_latents = noise_image_latents.to(torch.float16)
+                cond_embeddings = cond_embeddings.to(torch.float16)
+                latent_cur = latent_cur.to(torch.float16)
+                image_embeddings = image_embeddings.to(torch.float16)
+                uncond_embeddings = uncond_embeddings.to(torch.float16)
+                image_latents = image_latents.to(torch.float16)
                     
                 noise_pred_uncond = self.get_noise_pred_single(latent_cur, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=noise_image_latents)
                 # GUIDANCE_SCALE = torch.tensor(GUIDANCE_SCALE, dtype=torch.float32, device=noise_pred_uncond.device)
@@ -1152,10 +1351,11 @@ class I2VGenXLPipeline(DiffusionPipeline):
                 image_latents = image_latents.to(torch.float32)
                 
                 optimizer.step()
-                # if torch.count_nonzero(noise_image_embeddings.grad) != 0:
-                #     optimizer.step()  
-                # else:
-                #     optimizer.zero_grad() 
+                
+                if torch.isnan(noise_image_latents).any() or torch.isinf(noise_image_latents).any():
+                    logger.info(f"NaN or Inf detected in noise_image_latents at t={t}")
+                    break
+                
                 loss_item = loss.item()
                 bar.update()
                 if loss_item < epsilon + i * 2e-5:
@@ -1163,6 +1363,11 @@ class I2VGenXLPipeline(DiffusionPipeline):
             for j in range(j + 1, num_inner_steps):
                 bar.update()
             noise_latents_list.append(noise_image_latents[:1].detach())  #check this
+            
+            
+            if torch.isnan(noise_image_latents).any() or torch.isinf(noise_image_latents).any():
+                logger.info(f"NaN or Inf detected in noise_image_latents at t={t}")
+                break
             
             os.makedirs(output_dir, exist_ok=True)
             torch.save(
@@ -1498,7 +1703,10 @@ class I2VGenXLPipeline(DiffusionPipeline):
                     latent_model_input = torch.cat([ddim_inv_latents_at_t, latents])
 
                 if null_optimization:
-                    image_latents_all = torch.cat([null_latent_at_t ,image_latents_all[1:]])
+                    image_latents_all[1]=null_latent_at_t
+                    # null_latent_at_t=torch.rand_like(null_latent_at_t)
+                    # prompt_embeds_all = torch.cat([null_latent_at_t, prompt_embeds_all[1:]])
+                    # prompt_embeds_all[1]=null_latent_at_t
                     
                     # latent_model_input = torch.cat([latent_model_input, ddim_inv_latents_at_t])
                     # prompt_embeds_all=torch.cat([prompt_embeds_all,prompt_embeds_all[-1].unsqueeze(0)])
@@ -1529,7 +1737,7 @@ class I2VGenXLPipeline(DiffusionPipeline):
                 if self.do_classifier_free_guidance:
                     
                     if null_optimization:
-                        noise_pred_null, noise_pred_negative, noise_pred_editing = noise_pred.chunk(4)
+                        _noise_pred_ddim_inv,noise_pred_null, noise_pred_editing = noise_pred.chunk(4)
                         logger.debug(f"doing classifier free guidance and null latent enhancement with guidance_scale: {guidance_scale}")
                         noise_pred = noise_pred_null + guidance_scale * (noise_pred_editing - noise_pred_null)
                     

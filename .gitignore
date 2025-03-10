@@ -170,3 +170,5 @@ Edited_frames/*
 eval_tool/Deep3DFaceRecon_pytorch_edit/BFM/*.mat
 Results_full/*
 inversions_ind/*
+inversions_DATA/*
+Results_DATA/*

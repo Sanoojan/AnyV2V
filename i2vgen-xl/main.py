@@ -43,7 +43,7 @@ def main(config_path):
 
     # Load video frames
     logger.info(f"Loading frames from: {config.video_frames_path}")
-    _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, config.image_size)
+    _, frame_list = load_video_frames(config.video_frames_path, config.n_frames, config.image_size,naming_scheme=config.naming_scheme)
     first_frame = frame_list[0]
 
     # Initialize pipeline
@@ -62,7 +62,7 @@ def main(config_path):
     # Initialize schedulers
     inverse_scheduler = DDIMInverseScheduler.from_pretrained("ali-vilab/i2vgen-xl", subfolder="scheduler")
     ddim_scheduler = DDIMScheduler.from_pretrained("ali-vilab/i2vgen-xl", subfolder="scheduler")
-
+    edited_1st_frame = load_image(config.edited_first_frame_path).resize(config.image_size, resample=Image.LANCZOS)
     # Perform DDIM inversion
     inverse_conf_path = Path(config.inverse_config.output_dir)
     if not inverse_conf_path.exists() or config.inverse_config.force_inversion:
@@ -71,7 +71,7 @@ def main(config_path):
             _null_latents=pipe.null_optimization(_ddim_latents, 
                                                          config.null_optimization,
                                                          first_frame,
-                                                         ddim_inv_prompt=config.inverse_config.prompt)
+                                                         ddim_inv_prompt=config.inverse_config.prompt,edited_1st_frame=edited_1st_frame)
             
             
             
@@ -106,7 +106,7 @@ def main(config_path):
     # Load edited first frame and frames
     edited_1st_frame = load_image(config.edited_first_frame_path).resize(config.image_size, resample=Image.LANCZOS)
     edited_frames = [
-        load_image(os.path.join(config.edited_frames_path, f"{i:012d}.png")).resize(config.image_size, resample=Image.LANCZOS)
+        load_image(os.path.join(config.edited_frames_path, f"{i:0{config.edited_scheme}d}.png")).resize(config.image_size, resample=Image.LANCZOS)
         for i in range(min(config.editing.n_edited_frames, config.n_frames, len(os.listdir(config.edited_frames_path))))
     ]
 
@@ -167,6 +167,6 @@ def main(config_path):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, default="configs/Single_videos/yann_to_exersise_old_man.yaml", help="Path to config file")
+    parser.add_argument("--config", type=str, default="configs/Single_videos/CelebVHQ_video_test.yaml", help="Path to config file")
     args = parser.parse_args()
     main(args.config)
