@@ -1286,6 +1286,8 @@ class I2VGenXLPipeline(DiffusionPipeline):
         image_latents=image_latents[0,:,:,:,:].unsqueeze(0)
         image_embeddings=image_embeddings[0,:,:].unsqueeze(0)
         
+        Presision=self.unet.dtype
+        
         # self.unet=self.unet.to(torch.float32)
         
         for i in range(NUM_DDIM_STEPS):
@@ -1311,22 +1313,22 @@ class I2VGenXLPipeline(DiffusionPipeline):
             
             
             
+            Precision=self.unet.dtype
             
             
-            
-            optimizer = Adam([noise_image_latents], lr=1e-2 * (1. - i / 100.),foreach=True)
+            optimizer = Adam([noise_image_latents], lr=1e-4 * (1. - i / 100.),foreach=True)
             latent_prev = latents[len(latents) - i - 2]
             t = self.scheduler.timesteps[i]
             with torch.no_grad():
                 noise_pred_cond = self.get_noise_pred_single(latent_cur, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=image_latents)
             for j in range(num_inner_steps):
                 
-                noise_image_latents = noise_image_latents.to(torch.float16)
-                cond_embeddings = cond_embeddings.to(torch.float16)
-                latent_cur = latent_cur.to(torch.float16)
-                image_embeddings = image_embeddings.to(torch.float16)
-                uncond_embeddings = uncond_embeddings.to(torch.float16)
-                image_latents = image_latents.to(torch.float16)
+                noise_image_latents = noise_image_latents.to(Precision)
+                cond_embeddings = cond_embeddings.to(Precision)
+                latent_cur = latent_cur.to(Precision)
+                image_embeddings = image_embeddings.to(Precision)
+                uncond_embeddings = uncond_embeddings.to(Precision)
+                image_latents = image_latents.to(Precision)
                     
                 noise_pred_uncond = self.get_noise_pred_single(latent_cur, t, cond_embeddings,image_embeddings=image_embeddings,image_latents=noise_image_latents)
                 # GUIDANCE_SCALE = torch.tensor(GUIDANCE_SCALE, dtype=torch.float32, device=noise_pred_uncond.device)
@@ -1377,12 +1379,12 @@ class I2VGenXLPipeline(DiffusionPipeline):
             logger.debug(f"saved noisy latents at t={t} to {output_dir}")
             # #check this
             with torch.no_grad():
-                noise_image_latents = noise_image_latents.to(torch.float16)
-                cond_embeddings = cond_embeddings.to(torch.float16)
-                latent_cur = latent_cur.to(torch.float16)
-                image_embeddings = image_embeddings.to(torch.float16)
-                uncond_embeddings = uncond_embeddings.to(torch.float16)
-                image_latents = image_latents.to(torch.float16)
+                noise_image_latents = noise_image_latents.to(Precision)
+                cond_embeddings = cond_embeddings.to(Precision)
+                latent_cur = latent_cur.to(Precision)
+                image_embeddings = image_embeddings.to(Precision)
+                uncond_embeddings = uncond_embeddings.to(Precision)
+                image_latents = image_latents.to(Precision)
                 
                 Latents_all = torch.cat([noise_image_latents, image_latents])
                 

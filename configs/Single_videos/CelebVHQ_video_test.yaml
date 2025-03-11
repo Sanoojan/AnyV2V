@@ -7,7 +7,7 @@ debug: True  # For logging DEBUG level messages otherwise INFO
 data_dir: "/home/sanoojan/Video_diffusion/AnyV2V"
 model_name: "i2vgen-xl"
 task_name: "Prompt-Based-Editing"
-Experiment_name: "Debug_50_nul_latent_lr_2_2 0st"
+Experiment_name: "DBG_50_nul_latent_lr_1_e4_1st_flt32"
 video_name: "Clip+-1Jouc19Ixo+P0+C1+F4196-4320"
 output_dir: "${data_dir}/Results_DATA/${Experiment_name}/${task_name}/${model_name}/${video_name}"
 
@@ -23,7 +23,7 @@ naming_scheme: 8
 edited_scheme: 8
 
 # Video processing
-n_frames: 8
+n_frames: 2
 target_fps: 8
 
 # DDIM inversion
@@ -41,7 +41,7 @@ inverse_config:
 #null_optimization
 null_optimization:
   null_optimization: True
-  num_inner_steps: 20
+  num_inner_steps: 1
   epsilon: 1e-5
   n_steps: 50 # change this to 500
   guidance_scale: 9.0
