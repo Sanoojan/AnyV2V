@@ -55,35 +55,7 @@ def ddim_inversion(config, first_frame, frame_list, pipe: I2VGenXLPipeline, inve
     ddim_latents = ddim_latents[0]  # [num_inference_steps, c, num_frames, h, w]
     return ddim_latents
 
-# def null_inversion(config, first_frame, frame_list, pipe: I2VGenXLPipeline, inverse_scheduler, g):
-#     pipe.scheduler = inverse_scheduler
-#     video_latents_at_0 = pipe.encode_vae_video(
-#         frame_list,
-#         device=pipe._execution_device,
-#         height=config.image_size[1],
-#         width=config.image_size[0],
-#     )
-#     ddim_latents = pipe.null_invert(
-#         prompt=config.prompt,
-#         image=first_frame,
-#         height=config.image_size[1],
-#         width=config.image_size[0],
-#         num_frames=config.n_frames,
-#         num_inference_steps=config.n_steps,
-#         guidance_scale=config.cfg,
-#         negative_prompt=config.negative_prompt,
-#         target_fps=config.target_fps,
-#         latents=video_latents_at_0,
-#         generator=g,  # TODO: this is not correct
-#         return_dict=False,
-#         output_dir=config.output_dir,
-#     )  # [b, num_inference_steps, c, num_frames, h, w]
-#     logger = logging.getLogger(__name__)
-#     logger.debug(f"ddim_latents.shape: {ddim_latents.shape}")
-#     ddim_latents = ddim_latents[0]  # [num_inference_steps, c, num_frames, h, w]
-#     uncond_embeddings = null_optimization(ddim_latents, num_inner_steps, early_stop_epsilon)
-    
-#     return ddim_latents, uncond_embeddings
+
 
 
 # def null_optimization(latents,pipe, config):

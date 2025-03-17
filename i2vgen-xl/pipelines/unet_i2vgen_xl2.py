@@ -663,6 +663,7 @@ class I2VGenXLUNet2(ModelMixin, ConfigMixin, UNet2DConditionLoadersMixin):
                 upsample_size = down_block_res_samples[-1].shape[2:]
 
             if hasattr(upsample_block, "has_cross_attention") and upsample_block.has_cross_attention:
+                # pnp injection is happening inside the upsample block
                 sample = upsample_block(
                     hidden_states=sample,
                     temb=emb,
