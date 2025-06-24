@@ -88,9 +88,9 @@ def main(template_config, configs_list,run_all=False,samples=50):
         # extend the configs_list with the video_list
         for video_name in video_list:
             config_entry=OmegaConf.merge(config_template,OmegaConf.create({"video_name":video_name}))
-            edited_first_frame_path=os.path.join(edited_frames_dir,video_name,f"{template_config.edit_name_prefix}%0{template_config.edit_naming_scheme}d.{template_config.edit_image_format}"%0)
+            edited_first_frame_path=os.path.join(edited_frames_dir,video_name,"results",f"{template_config.edit_name_prefix}%0{template_config.edit_naming_scheme}d.{template_config.edit_image_format}"%0)
             config_entry.edited_first_frame_path=edited_first_frame_path
-            config_entry.edited_frames_path=os.path.join(edited_frames_dir,video_name)
+            config_entry.edited_frames_path=os.path.join(edited_frames_dir,video_name,"results")
             configs_list.append(config_entry)
         # breakpoint()
 
@@ -168,7 +168,7 @@ def main(template_config, configs_list,run_all=False,samples=50):
 
             # Edit video
             pipe.register_modules(scheduler=ddim_scheduler)
-            edited_video = pipe.sample_with_pnp(
+            edited_video,reconstructed_video = pipe.sample_with_pnp(
                     prompt=config.editing_prompt,
                     image=edited_1st_frame,
                     edited_images=edited_frame_list,
@@ -186,8 +186,8 @@ def main(template_config, configs_list,run_all=False,samples=50):
                     ddim_inv_latents_path=config.ddim_latents_path,
                     ddim_inv_prompt=config.ddim_inv_prompt,
                     ddim_inv_1st_frame=src_1st_frame,
-            ).frames[0]
-
+            )
+            edited_video=edited_video.frames[0]
             # Save video
             # Add the config to the output_dir, TODO: make this more elegant
             config_suffix = (

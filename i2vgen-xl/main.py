@@ -21,7 +21,7 @@ from pnp_utils import register_time, register_conv_injection
 from run_group_pnp_edit import init_pnp
 # set cuda visible device 2
 
-Precision=torch.float32
+Precision=torch.float16
 
 
 def setup_logging(debug):
@@ -75,7 +75,12 @@ def main(config_path):
                                                          first_frame,
                                                          ddim_inv_prompt=config.inverse_config.prompt,edited_1st_frame=edited_1st_frame)
             
-            
+        elif config.pnp_inversion.pnp_inversion:
+            _ddim_latents = ddim_inversion(config.inverse_config, first_frame, frame_list, pipe, inverse_scheduler, g)
+            _pnp_latents=pipe.pnp_inversion(_ddim_latents,
+                                            config.pnp_inversion,
+                                            first_frame,
+                                            edited_1st_frame=edited_1st_frame)
             
             # find uncond inversion latents (null_inversion_embedded)
 
@@ -127,7 +132,7 @@ def main(config_path):
 
     # Edit video
     pipe.register_modules(scheduler=ddim_scheduler)
-    edited_video = pipe.sample_with_pnp(
+    edited_video,original_video = pipe.sample_with_pnp(
         prompt=config.editing.editing_prompt,
         image=edited_1st_frame,
         edited_images=edited_frames,
@@ -147,8 +152,9 @@ def main(config_path):
         ddim_inv_latents_path=config.ddim_latents_path,
         ddim_inv_prompt=config.editing.ddim_inv_prompt,
         ddim_inv_1st_frame=src_1st_frame,
-    ).frames[0]
-    
+    )
+    edited_video=edited_video.frames[0]
+    original_video=original_video.frames[0]
     
     if not os.path.exists(config.output_dir):
         os.makedirs(config.output_dir, exist_ok=True)
@@ -164,6 +170,19 @@ def main(config_path):
         
       frame.save(os.path.join(config.output_dir, f"{edited_video_file_name}_{i:05d}.png"))
       logger.info(f"Saved frames to: {os.path.join(config.output_dir, f'{edited_video_file_name}_{i:05d}.png')}")
+      
+      
+    # Save original video
+    output_path = os.path.join(config.output_dir, "original_video.mp4")
+    export_to_video(original_video, output_path, fps=config.target_fps)
+    logger.info(f"Saved original video to: {output_path}")
+    export_to_gif(original_video, os.path.join(config.output_dir, "original_video.gif"))
+    logger.info(f"Saved original video to: {output_path}")
+    original_video_file_name = "Original_video"
+    for i, frame in enumerate(original_video):
+        
+      frame.save(os.path.join(config.output_dir, f"{original_video_file_name}_{i:05d}.png"))
+      logger.info(f"Saved frames to: {os.path.join(config.output_dir, f'{original_video_file_name}_{i:05d}.png')}")
 
 
 if __name__ == "__main__":

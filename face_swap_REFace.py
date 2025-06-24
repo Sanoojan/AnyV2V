@@ -14,11 +14,24 @@ video_number=0
 source_images_path=natsorted(os.listdir(Source_image_folder))
 source_images_path=[os.path.join(Source_image_folder,source_images_path[i]) for i in range(len(source_images_path))]
 
+mapping_path="swapping_mapping.txt"
+
 for folder in natsorted(os.listdir(Target_main_folder)):
     print(folder)
     
     
     folder_path=os.path.join(Target_main_folder,folder)
+    folder_name=os.path.basename(folder_path)
+    # save folder_name and video_number in mapping file
+
+    with open(mapping_path, "a") as f:
+        f.write(f"{folder_name}:{video_number}\n")
+    
+    print(folder_path)
+    print(source_images_path[video_number])
+    print("*************")
+    video_number+=1 
+    continue
     
     for i in range(number_fo_target_frames):
         save_path= os.path.join(save_path_folder,folder)

@@ -7,7 +7,7 @@ debug: True  # For logging DEBUG level messages otherwise INFO
 data_dir: "/home/sanoojan/Video_diffusion/AnyV2V"
 model_name: "i2vgen-xl"
 task_name: "Prompt-Based-Editing"
-Experiment_name: "DBG_guidance_9_500_same_img"
+Experiment_name: "DBG_source_image_direct"
 video_name: "Clip+-1Jouc19Ixo+P0+C1+F4196-4320"
 output_dir: "${data_dir}/Results_DATA/${Experiment_name}/${task_name}/${model_name}/${video_name}"
 
@@ -15,8 +15,10 @@ output_dir: "${data_dir}/Results_DATA/${Experiment_name}/${task_name}/${model_na
 image_size: [512, 512]
 video_dir: "${data_dir}/data/Data/VFHQ-Test/GT/Interval1_512x512_LANCZOS4"
 video_frames_path: "${video_dir}/${video_name}"
-# edited_first_frame_path: "${data_dir}/Edited_frames/REFace/${video_name}/00000000.png"
-edited_first_frame_path: "${video_frames_path}/00000000.png"
+edited_first_frame_path: "${data_dir}/Edited_frames/REFace/${video_name}/00000000.png"
+# edited_first_frame_path: "${data_dir}/Edited_frames/SimSwap/${video_name}/frame_0000000.jpg"
+# edited_first_frame_path: "${video_frames_path}/00000000.png"
+# edited_first_frame_path: "${data_dir}/data/Data/VFHQ-Test/Celeb_Source/10.jpg"
 edited_frames_path: "${data_dir}/Edited_frames/REFace/${video_name}"
 ddim_latents_path: "${data_dir}/inversions_DATA/${Experiment_name}/${model_name}/${video_name}/ddim_latents"
 null_latents_path: "${data_dir}/inversions_DATA/${Experiment_name}/${model_name}/${video_name}/null_latents"
@@ -29,7 +31,7 @@ target_fps: 8
 
 # DDIM inversion
 inverse_config:
-  force_inversion: True
+  force_inversion: False
   cfg: 1.0
   n_steps: 500   # change this to 500
   prompt: "A human"
@@ -42,6 +44,16 @@ inverse_config:
 #null_optimization
 null_optimization:
   null_optimization: False
+  num_inner_steps: 1
+  epsilon: 1e-5
+  n_steps: 50 # change this to 500
+  guidance_scale: 9.0
+  image_size: "${image_size}"
+  n_frames: "${n_frames}"
+  output_dir: "${null_latents_path}"
+
+pnp_inversion:
+  pnp_inversion: False
   num_inner_steps: 1
   epsilon: 1e-5
   n_steps: 50 # change this to 500

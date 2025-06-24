@@ -10,7 +10,7 @@ cd ..
 # --samples 50
 
 python run_group_pnp_edit.py \
---template_config "configs/group_pnp_edit/template_common.yaml" \
+--template_config "configs/group_pnp_edit/template_common_experiment.yaml" \
 --configs_json "configs/group_pnp_edit/group_config_common.json" \
 --run_all \
---samples 50
+--samples 10
